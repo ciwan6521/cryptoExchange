@@ -1,0 +1,239 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Font setup - using Inter as primary, JetBrains Mono for monospace */
+/* For custom display font, add Clash Display from fontshare.com */
+
+/* CSS Variables for theming */
+:root {
+  --font-clash: 'Clash Display', system-ui, sans-serif;
+  
+  /* Animation timing */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-expo: cubic-bezier(0.87, 0, 0.13, 1);
+  
+  /* Z-index scale */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 300;
+  --z-popover: 400;
+  --z-tooltip: 500;
+}
+
+/* Base styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: #0a0b0c;
+  color: #e5e7eb;
+  font-feature-settings: 'rlig' 1, 'calt' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection styling */
+::selection {
+  background: rgba(20, 184, 166, 0.3);
+  color: #ffffff;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid rgba(20, 184, 166, 0.5);
+  outline-offset: 2px;
+}
+
+/* Utility classes */
+@layer utilities {
+  /* Glass effect */
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  /* Text gradient */
+  .text-gradient {
+    background: linear-gradient(135deg, #14b8a6 0%, #2dd4bf 50%, #5eead4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Glow effects */
+  .glow-brand {
+    box-shadow: 0 0 20px rgba(20, 184, 166, 0.15),
+                0 0 40px rgba(20, 184, 166, 0.1),
+                0 0 60px rgba(20, 184, 166, 0.05);
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Number tabular figures for trading */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Skeleton shimmer effect */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 25%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+  
+  /* Profit/Loss text colors with subtle glow */
+  .text-profit {
+    color: #22c55e;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+  }
+  
+  .text-loss {
+    color: #ef4444;
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+  }
+  
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Trading-specific styles */
+@layer components {
+  /* Orderbook row flash animation */
+  .orderbook-flash-bid {
+    animation: flashBid 0.5s ease-out;
+  }
+  
+  .orderbook-flash-ask {
+    animation: flashAsk 0.5s ease-out;
+  }
+  
+  @keyframes flashBid {
+    0% { background-color: rgba(34, 197, 94, 0.3); }
+    100% { background-color: transparent; }
+  }
+  
+  @keyframes flashAsk {
+    0% { background-color: rgba(239, 68, 68, 0.3); }
+    100% { background-color: transparent; }
+  }
+  
+  /* Price change animation */
+  .price-up {
+    animation: priceUp 0.3s ease-out;
+  }
+  
+  .price-down {
+    animation: priceDown 0.3s ease-out;
+  }
+  
+  @keyframes priceUp {
+    0% { color: #22c55e; transform: translateY(2px); }
+    100% { transform: translateY(0); }
+  }
+  
+  @keyframes priceDown {
+    0% { color: #ef4444; transform: translateY(-2px); }
+    100% { transform: translateY(0); }
+  }
+  
+  /* Input styles */
+  .input-trading {
+    @apply bg-surface-100 border border-glass-border rounded-lg px-4 py-3
+           text-white placeholder-gray-500 
+           transition-all duration-200
+           focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20
+           hover:border-glass-hover;
+  }
+  
+  /* Button base */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2
+           font-medium rounded-lg
+           transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply btn bg-brand-500 text-white
+           hover:bg-brand-400 active:bg-brand-600
+           shadow-lg shadow-brand-500/20;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-surface-50 text-gray-200 border border-glass-border
+           hover:bg-surface-100 hover:border-glass-hover;
+  }
+  
+  .btn-ghost {
+    @apply btn text-gray-400
+           hover:text-white hover:bg-white/5;
+  }
+}
+
+/* Three.js canvas optimization */
+canvas {
+  touch-action: none;
+}
+
