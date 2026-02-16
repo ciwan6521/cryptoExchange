@@ -8,6 +8,7 @@ Run: python -m app.seed
 """
 
 import asyncio
+import os
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -19,11 +20,12 @@ from app.models.cms import SystemFlag
 from app.utils.security import hash_password
 
 
+# Admin passwords MUST come from environment variables — never hardcoded.
 ADMIN_ACCOUNTS = [
-    {"email": "admin@nexus.com", "username": "admin", "password": "Admin123!", "role": "super_admin"},
-    {"email": "operator@nexus.com", "username": "operator", "password": "Operator123!", "role": "operator"},
-    {"email": "finance@nexus.com", "username": "finance", "password": "Finance123!", "role": "finance"},
-    {"email": "viewer@nexus.com", "username": "viewer", "password": "Viewer123!", "role": "readonly"},
+    {"email": "admin@nexus.com", "username": "admin", "password": os.environ.get("SEED_ADMIN_PASSWORD", ""), "role": "super_admin"},
+    {"email": "operator@nexus.com", "username": "operator", "password": os.environ.get("SEED_OPERATOR_PASSWORD", ""), "role": "operator"},
+    {"email": "finance@nexus.com", "username": "finance", "password": os.environ.get("SEED_FINANCE_PASSWORD", ""), "role": "finance"},
+    {"email": "viewer@nexus.com", "username": "viewer", "password": os.environ.get("SEED_VIEWER_PASSWORD", ""), "role": "readonly"},
 ]
 
 TRADING_PAIRS = [
@@ -89,6 +91,12 @@ async def seed():
     async with async_session_factory() as db:
         # --- Admin Accounts ---
         for acct in ADMIN_ACCOUNTS:
+            if not acct["password"]:
+                print(f"  [!] SKIPPED: {acct['email']} — set SEED_{acct['role'].upper()}_PASSWORD env var")
+                continue
+            if len(acct["password"]) < 12:
+                print(f"  [!] SKIPPED: {acct['email']} — password must be >= 12 chars")
+                continue
             existing = await db.execute(
                 select(AdminUser).where(AdminUser.email == acct["email"])
             )
@@ -98,9 +106,10 @@ async def seed():
                     username=acct["username"],
                     password_hash=hash_password(acct["password"]),
                     role=acct["role"],
+                    force_password_change=True,
                 )
                 db.add(admin)
-                print(f"  [+] Admin: {acct['email']} ({acct['role']})")
+                print(f"  [+] Admin: {acct['email']} ({acct['role']}) — must change password on first login")
             else:
                 print(f"  [=] Admin already exists: {acct['email']}")
 

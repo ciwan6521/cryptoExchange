@@ -12,7 +12,7 @@ Rules:
 
 import uuid
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select
@@ -115,7 +115,7 @@ class LedgerService:
 
         # 5. Update cached balance (atomic with entry)
         account.available = new_balance
-        account.updated_at = datetime.utcnow()
+        account.updated_at = datetime.now(timezone.utc)
 
         await self.db.flush()
         return entry
@@ -176,7 +176,7 @@ class LedgerService:
 
         # 5. Update cached balance
         account.available = new_balance
-        account.updated_at = datetime.utcnow()
+        account.updated_at = datetime.now(timezone.utc)
 
         await self.db.flush()
         return entry
@@ -227,7 +227,7 @@ class LedgerService:
 
         account.available -= amount
         account.locked += amount
-        account.updated_at = datetime.utcnow()
+        account.updated_at = datetime.now(timezone.utc)
 
         await self.db.flush()
         return entry
@@ -278,7 +278,7 @@ class LedgerService:
 
         account.available += amount
         account.locked -= amount
-        account.updated_at = datetime.utcnow()
+        account.updated_at = datetime.now(timezone.utc)
 
         await self.db.flush()
         return entry
@@ -329,7 +329,7 @@ class LedgerService:
         self.db.add(entry)
 
         account.locked -= amount
-        account.updated_at = datetime.utcnow()
+        account.updated_at = datetime.now(timezone.utc)
 
         await self.db.flush()
         return entry
@@ -357,6 +357,8 @@ class LedgerService:
         offset: int = 0,
     ) -> list[LedgerEntry]:
         """Get ledger history for a user with optional filters."""
+        # Server-side cap — never return more than 200 rows regardless of input
+        limit = min(limit, 200)
         query = (
             select(LedgerEntry)
             .where(LedgerEntry.user_id == user_id)

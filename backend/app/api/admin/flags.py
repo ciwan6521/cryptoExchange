@@ -41,6 +41,9 @@ async def get_flags(
     return {"flags": merged}
 
 
+CRITICAL_FLAGS = {"trading_enabled", "withdrawals_enabled", "deposits_enabled", "maintenance_mode"}
+
+
 @router.patch("/{key}")
 async def update_flag(
     key: str,
@@ -49,9 +52,16 @@ async def update_flag(
     admin: AdminUser = Depends(require_admin_role("super_admin", "operator")),
     db: AsyncSession = Depends(get_db),
 ):
+    from fastapi import HTTPException
     if key not in DEFAULT_FLAGS:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=f"Unknown flag: {key}")
+
+    # Kill-switch flags require super_admin — prevents operator-level compromise
+    if key in CRITICAL_FLAGS and admin.role != "super_admin":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Flag '{key}' can only be toggled by super_admin",
+        )
 
     result = await db.execute(select(SystemFlag).where(SystemFlag.key == key))
     flag = result.scalar_one_or_none()
@@ -70,6 +80,18 @@ async def update_flag(
         ip_address=request.client.host if request.client else None,
     )
     db.add(log)
+
+    # Critical event: kill-switch toggled
+    if key in CRITICAL_FLAGS:
+        from app.services.critical_events import log_critical_event
+        await log_critical_event(
+            db, event_type="kill_switch_toggled",
+            details={"flag": key, "new_value": body.value, "admin": admin.email},
+            admin_id=admin.id, target_type="system_flag",
+            ip_address=request.client.host if request.client else None,
+            severity="critical",
+        )
+
     await db.commit()
 
     return {"ok": True, "key": key, "value": body.value}

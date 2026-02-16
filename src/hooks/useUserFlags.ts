@@ -32,7 +32,7 @@ export function useUserFlags(): UserFlags {
   const mockUsers = useAdminStore((s) => s.mockUsers);
 
   return useMemo(() => {
-    if (!authUser?.email) return DEFAULT_FLAGS;
+    if (!authUser?.email || !Array.isArray(mockUsers)) return DEFAULT_FLAGS;
 
     const matched = mockUsers.find(
       (u) => u.email.toLowerCase() === authUser.email.toLowerCase()

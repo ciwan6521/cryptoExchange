@@ -28,8 +28,8 @@ class Account(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", back_populates="accounts")
-    entries = relationship("LedgerEntry", back_populates="account")
+    user = relationship("User", back_populates="accounts", lazy="raise")
+    entries = relationship("LedgerEntry", back_populates="account", lazy="raise")
 
 
 class LedgerEntry(Base):
@@ -81,7 +81,7 @@ class LedgerEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    account = relationship("Account", back_populates="entries")
+    account = relationship("Account", back_populates="entries", lazy="raise")
 
 
 class BalanceSnapshot(Base):

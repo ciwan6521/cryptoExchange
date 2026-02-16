@@ -361,6 +361,109 @@ export const tradingApi = {
   },
 };
 
+// ============================================
+// Orders API (place + cancel)
+// ============================================
+
+export interface PlaceOrderRequest {
+  symbol: string;
+  side: 'buy' | 'sell';
+  order_type: 'limit' | 'market';
+  quantity: string;
+  price?: string;
+}
+
+export interface PlaceOrderResponse {
+  ok: boolean;
+  order: OrderItem;
+  fills: TradeItem[];
+  fills_count: number;
+}
+
+export const ordersApi = {
+  place: (data: PlaceOrderRequest) =>
+    request<PlaceOrderResponse>('/api/orders/place', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  cancel: (orderId: string) =>
+    request<{ ok: boolean; order: OrderItem }>(`/api/orders/${orderId}/cancel`, {
+      method: 'POST',
+    }),
+};
+
+// ============================================
+// Withdrawal API
+// ============================================
+
+export interface WithdrawalItem {
+  id: string;
+  asset: string;
+  network: string;
+  amount: string;
+  fee: string;
+  to_address: string;
+  status: string;
+  requires_multi_approval: boolean;
+  approvals_required: number;
+  approvals_received: number;
+  tx_hash: string | null;
+  rejection_reason: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface WithdrawalAddressItem {
+  id: string;
+  asset: string;
+  network: string;
+  address: string;
+  label: string | null;
+  is_whitelisted: boolean;
+  is_available: boolean;
+  cooldown_until: string;
+  first_added_at: string;
+}
+
+export const withdrawalApi = {
+  request: (data: { asset: string; network: string; amount: string; to_address: string }) =>
+    request<{ ok: boolean; withdrawal: WithdrawalItem; message: string; flagged: boolean }>(
+      '/api/withdrawals/request',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  cancel: (withdrawalId: string) =>
+    request<{ ok: boolean; withdrawal: WithdrawalItem }>(
+      `/api/withdrawals/${withdrawalId}/cancel`,
+      { method: 'POST' },
+    ),
+
+  getHistory: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set('status', params.status);
+    if (params?.limit) sp.set('limit', String(params.limit));
+    if (params?.offset) sp.set('offset', String(params.offset));
+    const qs = sp.toString();
+    return request<{ withdrawals: WithdrawalItem[]; total: number }>(
+      `/api/withdrawals/my${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  getAddresses: () =>
+    request<{ addresses: WithdrawalAddressItem[] }>('/api/withdrawals/addresses'),
+
+  addAddress: (data: { asset: string; network: string; address: string; label?: string }) =>
+    request<{ ok: boolean; message: string; cooldown_until: string }>(
+      '/api/withdrawals/addresses',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+};
+
+// ============================================
+// CMS API
+// ============================================
+
 export const cmsApi = {
   getActive: () =>
     request<{ content: Array<{

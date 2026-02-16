@@ -11,6 +11,8 @@ import { isEnabled } from '@/lib/feature-flags';
 import { useTradingDisabled } from './ConnectionStatus';
 import { useAdminStore } from '@/stores/admin-store';
 import { useUserFlags } from '@/hooks/useUserFlags';
+import { useOrderStore } from '@/stores/order-store';
+import { ApiError } from '@/lib/api';
 
 // ============================================
 // Order Form Component
@@ -57,9 +59,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const tradingDisabled = useTradingDisabled();
   const liveTradingEnabled = isEnabled('ENABLE_LIVE_TRADING');
   const { tradingEnabled: adminTradingOn, newOrdersEnabled: adminNewOrdersOn } = useAdminStore((s) => s.systemFlags);
-  const tradingPairs = useAdminStore((s) => s.tradingPairs);
-  const pairConfig = useMemo(() => tradingPairs.find((p) => p.pair === symbol), [tradingPairs, symbol]);
-  const pairDisabled = pairConfig ? !pairConfig.enabled : false;
+  const pairDisabled = false; // Pair-level disable comes from backend via market API
   const { userTradingEnabled } = useUserFlags();
   const stopLimitEnabled = isEnabled('ENABLE_STOP_LIMIT');
 
@@ -117,20 +117,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       return false;
     }
 
-    // Enforce admin pair config min/max order size
-    if (pairConfig) {
-      const qty = parseFloat(quantity);
-      const minOrder = parseFloat(pairConfig.minOrderSize);
-      const maxOrder = parseFloat(pairConfig.maxOrderSize);
-      if (!isNaN(minOrder) && minOrder > 0 && qty < minOrder) {
-        setError(`Minimum order size is ${pairConfig.minOrderSize} ${baseAsset}`);
-        return false;
-      }
-      if (!isNaN(maxOrder) && maxOrder > 0 && qty > maxOrder) {
-        setError(`Maximum order size is ${pairConfig.maxOrderSize} ${baseAsset}`);
-        return false;
-      }
-    }
+    // Order size min/max enforcement is handled server-side by the execution engine
 
     const priceToValidate = orderType === 'market' ? currentPrice.toString() : price;
     const balanceStr = side === 'buy' ? availableQuote.toString() : availableBase.toString();
@@ -159,12 +146,24 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       total,
     };
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    onSubmit?.(orderData);
-    setIsSubmitting(false);
-    setQuantity('');
+    try {
+      const dashSymbol = symbol.replace('/', '-');
+      const result = await useOrderStore.getState().placeOrder({
+        symbol: dashSymbol,
+        side,
+        order_type: orderType === 'stop-limit' ? 'limit' : orderType,
+        quantity,
+        price: orderType !== 'market' ? price : undefined,
+      });
+      onSubmit?.(orderData);
+      setQuantity('');
+      setError(null);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.detail : 'Order placement failed';
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isDisabled = !liveTradingEnabled || tradingDisabled || !adminTradingOn || !adminNewOrdersOn || pairDisabled || !userTradingEnabled;

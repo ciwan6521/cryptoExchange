@@ -3,7 +3,7 @@ Security utilities — password hashing, JWT encode/decode.
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
@@ -35,12 +35,12 @@ def create_access_token(
         secret = settings.JWT_SECRET_KEY
         default_expire = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    expire = datetime.utcnow() + (expires_delta or default_expire)
+    expire = datetime.now(timezone.utc) + (expires_delta or default_expire)
     payload = {
         "sub": subject,
         "type": token_type,
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
         "jti": str(uuid.uuid4()),
     }
     return jwt.encode(payload, secret, algorithm=settings.JWT_ALGORITHM)
@@ -48,12 +48,12 @@ def create_access_token(
 
 def create_refresh_token(subject: str) -> tuple[str, datetime]:
     """Create a refresh token. Returns (token, expires_at)."""
-    expires_at = datetime.utcnow() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {
         "sub": subject,
         "type": "refresh",
         "exp": expires_at,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
         "jti": str(uuid.uuid4()),
     }
     token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)

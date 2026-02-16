@@ -65,6 +65,12 @@ class AdminUserResponse(BaseModel):
 
 
 class AdminAuthResponse(BaseModel):
+    """Legacy — kept for backwards compatibility."""
     admin: AdminUserResponse
     access_token: str
     token_type: str = "bearer"
+
+
+class AdminLoginResponse(BaseModel):
+    """Admin login response — token is in httpOnly cookie, not in body."""
+    admin: AdminUserResponse

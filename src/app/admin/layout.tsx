@@ -189,7 +189,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               Main App
             </Link>
             <button
-              onClick={() => {
+              onClick={async () => {
+                try { await fetch('/api/admin/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
                 adminLogout();
                 router.push('/admin/login');
               }}

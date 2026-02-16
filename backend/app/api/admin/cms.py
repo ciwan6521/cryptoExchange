@@ -1,5 +1,6 @@
 """Admin CMS content CRUD routes."""
 
+import re
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -13,6 +14,17 @@ from app.database import get_db
 from app.models.user import AdminUser
 from app.models.cms import CMSContent, AuditLog
 from app.api.deps import get_current_admin, require_admin_role
+
+
+ALLOWED_CONTENT_TYPES = {"announcement", "banner", "popup", "maintenance"}
+ALLOWED_PRIORITIES = {"low", "medium", "high", "critical"}
+
+
+def _sanitize_html(text: str | None) -> str | None:
+    """Strip all HTML tags to prevent stored XSS."""
+    if text is None:
+        return None
+    return re.sub(r'<[^>]+>', '', text).strip()
 
 router = APIRouter(prefix="/api/admin/cms", tags=["admin-cms"])
 
@@ -69,10 +81,15 @@ async def create_cms(
     admin: AdminUser = Depends(require_admin_role("super_admin", "operator")),
     db: AsyncSession = Depends(get_db),
 ):
+    if body.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid content_type. Must be one of: {ALLOWED_CONTENT_TYPES}")
+    if body.priority not in ALLOWED_PRIORITIES:
+        raise HTTPException(status_code=400, detail=f"Invalid priority. Must be one of: {ALLOWED_PRIORITIES}")
+
     content = CMSContent(
         content_type=body.content_type,
-        title=body.title,
-        body=body.body,
+        title=_sanitize_html(body.title),
+        body=_sanitize_html(body.body),
         priority=body.priority,
         is_active=body.is_active,
         start_date=datetime.fromisoformat(body.start_date),

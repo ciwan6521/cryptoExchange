@@ -49,7 +49,7 @@ class Order(Base):
 
     side: Mapped[str] = mapped_column(String(4), nullable=False)  # 'buy' or 'sell'
     order_type: Mapped[str] = mapped_column(String(15), nullable=False)  # 'limit', 'market', 'stop_limit'
-    status: Mapped[str] = mapped_column(String(15), nullable=False, default="open", index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", index=True)
     # Status: open, partially_filled, filled, cancelled, expired
 
     price: Mapped[Decimal | None] = mapped_column(Numeric(36, 18), nullable=True)  # NULL for market

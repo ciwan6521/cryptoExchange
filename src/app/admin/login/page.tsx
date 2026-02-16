@@ -10,12 +10,13 @@ import { adminAuthApi, AdminApiError } from '@/lib/admin-api';
 // ============================================
 // Admin Login Page
 // Separate auth flow from user login.
-// Supports 2FA verification step (mock).
+// Supports real 2FA (TOTP) verification.
+// Token is set as httpOnly cookie by backend.
 // ============================================
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { adminLogin, addAuditEntry, set2FAPending } = useAdminStore();
+  const { adminLogin, set2FAPending } = useAdminStore();
 
   const [step, setStep] = useState<'credentials' | '2fa'>('credentials');
   const [email, setEmail] = useState('');
@@ -23,7 +24,6 @@ export default function AdminLoginPage() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [pendingLogin, setPendingLogin] = useState<{ access_token: string; admin: { id: string; email: string; username: string; role: string; totp_enabled: boolean } } | null>(null);
 
   const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,16 +33,7 @@ export default function AdminLoginPage() {
     try {
       const res = await adminAuthApi.login({ email: email.trim().toLowerCase(), password });
 
-      // If 2FA is enabled, go to 2FA step
-      if (res.admin.totp_enabled) {
-        setPendingLogin(res);
-        set2FAPending(true);
-        setStep('2fa');
-        setLoading(false);
-        return;
-      }
-
-      // Direct login — store token + admin profile
+      // Login succeeded — httpOnly cookie is set by backend
       const adminUser = {
         id: res.admin.id,
         email: res.admin.email,
@@ -50,13 +41,18 @@ export default function AdminLoginPage() {
         role: res.admin.role as any,
         twoFactorEnabled: res.admin.totp_enabled,
         lastLogin: Date.now(),
-        ipAllowlist: [],
       };
-      adminLogin(adminUser, res.access_token);
+      adminLogin(adminUser);
       router.push('/admin');
     } catch (err) {
       const msg = err instanceof AdminApiError ? err.detail : 'Login failed';
-      setError(msg);
+      // If backend says TOTP required, show 2FA step
+      if (msg === 'TOTP code required') {
+        set2FAPending(true);
+        setStep('2fa');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -67,27 +63,36 @@ export default function AdminLoginPage() {
     setError('');
     setLoading(true);
 
-    // TODO: real TOTP verification via backend when implemented
-    // For now accept any 6-digit code (backend does not verify TOTP yet)
     if (!/^\d{6}$/.test(twoFactorCode)) {
       setError('Enter a valid 6-digit code');
       setLoading(false);
       return;
     }
 
-    if (pendingLogin) {
+    try {
+      // Re-send login with TOTP code — backend verifies
+      const res = await adminAuthApi.login({
+        email: email.trim().toLowerCase(),
+        password,
+        totp_code: twoFactorCode,
+      });
+
       const adminUser = {
-        id: pendingLogin.admin.id,
-        email: pendingLogin.admin.email,
-        name: pendingLogin.admin.username,
-        role: pendingLogin.admin.role as any,
-        twoFactorEnabled: pendingLogin.admin.totp_enabled,
+        id: res.admin.id,
+        email: res.admin.email,
+        name: res.admin.username,
+        role: res.admin.role as any,
+        twoFactorEnabled: res.admin.totp_enabled,
         lastLogin: Date.now(),
-        ipAllowlist: [],
       };
-      adminLogin(adminUser, pendingLogin.access_token);
+      adminLogin(adminUser);
+      router.push('/admin');
+    } catch (err) {
+      const msg = err instanceof AdminApiError ? err.detail : 'Verification failed';
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
-    router.push('/admin');
   };
 
   return (
@@ -214,17 +219,6 @@ export default function AdminLoginPage() {
             </button>
           </form>
         )}
-
-        {/* Test accounts hint */}
-        <div className="mt-6 p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
-          <p className="text-[10px] font-medium text-gray-600 mb-2">Test Accounts</p>
-          <div className="space-y-1 text-[10px] text-gray-700 font-mono">
-            <p>admin@nexus.com / Admin123! <span className="text-red-400">(Super Admin, 2FA)</span></p>
-            <p>operator@nexus.com / Operator123!</p>
-            <p>finance@nexus.com / Finance123!</p>
-            <p>viewer@nexus.com / Viewer123!</p>
-          </div>
-        </div>
       </div>
     </div>
   );

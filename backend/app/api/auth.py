@@ -4,10 +4,10 @@ Tokens are delivered via httpOnly cookies — never exposed to JavaScript.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
-from sqlalchemy import select
+from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -20,6 +20,7 @@ from app.schemas.auth import (
 from app.utils.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 from app.api.deps import get_current_user
 from app.events.bus import EventBus
+from app.utils.password_policy import validate_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -33,7 +34,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         value=access_token,
         httponly=True,
         secure=IS_PROD,
-        samesite="lax",
+        samesite="strict",
         max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
@@ -42,7 +43,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         value=refresh_token,
         httponly=True,
         secure=IS_PROD,
-        samesite="lax",
+        samesite="strict",
         max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 86400,
         path="/api/auth",  # Only sent to auth endpoints
     )
@@ -66,12 +67,17 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
     if existing_name.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already taken")
 
+    # Enforce password policy
+    pw_errors = validate_password(body.password, is_admin=False)
+    if pw_errors:
+        raise HTTPException(status_code=400, detail="; ".join(pw_errors))
+
     # Create user
     user = User(
         email=body.email,
         username=body.username,
         password_hash=hash_password(body.password),
-        last_login_at=datetime.utcnow(),
+        last_login_at=datetime.now(timezone.utc),
         last_login_ip=request.client.host if request.client else None,
     )
     db.add(user)
@@ -135,7 +141,7 @@ async def login(body: LoginRequest, request: Request, response: Response, db: As
     # TODO: TOTP verification if user.totp_enabled
 
     # Update last login
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(timezone.utc)
     user.last_login_ip = request.client.host if request.client else None
 
     # Create tokens
@@ -197,9 +203,8 @@ async def logout(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Delete all sessions for this user
-    from sqlalchemy import delete
-    await db.execute(delete(UserSession).where(UserSession.user_id == user.id))
+    # Delete all sessions for this user (revokes all refresh tokens)
+    await db.execute(sa_delete(UserSession).where(UserSession.user_id == user.id))
     await db.commit()
     _clear_auth_cookies(response)
     return {"ok": True}
@@ -207,7 +212,7 @@ async def logout(
 
 @router.post("/refresh", response_model=UserResponse)
 async def refresh_token(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
-    """Refresh access token using refresh_token cookie."""
+    """Refresh access token using refresh_token cookie. Validates against DB and rotates token."""
     token = request.cookies.get("refresh_token")
     if not token:
         raise HTTPException(status_code=401, detail="No refresh token")
@@ -221,23 +226,50 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
+    # CRITICAL: Validate refresh token exists in DB (catches revoked tokens)
+    session_result = await db.execute(
+        select(UserSession).where(
+            UserSession.refresh_token == token,
+            UserSession.user_id == uuid.UUID(user_id),
+        )
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        # Token was revoked (e.g., by logout) — clear cookies and reject
+        _clear_auth_cookies(response)
+        raise HTTPException(status_code=401, detail="Refresh token revoked")
+
+    # Check expiry
+    if session.expires_at < datetime.now(timezone.utc):
+        await db.delete(session)
+        await db.commit()
+        _clear_auth_cookies(response)
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         _clear_auth_cookies(response)
         raise HTTPException(status_code=401, detail="User not found or disabled")
 
-    # Issue new access token, keep same refresh token
+    # Token rotation: delete old session, create new refresh token
+    await db.delete(session)
+
     new_access = create_access_token(str(user.id), token_type="user")
-    response.set_cookie(
-        key="access_token",
-        value=new_access,
-        httponly=True,
-        secure=IS_PROD,
-        samesite="lax",
-        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",
+    new_refresh, new_refresh_expires = create_refresh_token(str(user.id))
+
+    new_session = UserSession(
+        user_id=user.id,
+        refresh_token=new_refresh,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        expires_at=new_refresh_expires,
     )
+    db.add(new_session)
+    await db.commit()
+
+    # Set rotated cookies
+    _set_auth_cookies(response, new_access, new_refresh)
 
     return UserResponse(
         id=user.id,

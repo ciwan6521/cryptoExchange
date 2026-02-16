@@ -4,8 +4,6 @@
 // Separate from user API client (different auth flow)
 // ============================================
 
-import { useAdminStore } from '@/stores/admin-store';
-
 export class AdminApiError extends Error {
   status: number;
   detail: string;
@@ -18,36 +16,22 @@ export class AdminApiError extends Error {
   }
 }
 
-function getToken(): string | null {
-  return useAdminStore.getState().adminToken;
-}
-
 async function adminRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
   const url = path.startsWith('/') ? path : `/${path}`;
-  const token = getToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   const res = await fetch(url, {
     ...options,
     headers,
-    credentials: 'include',
+    credentials: 'include', // httpOnly cookie sent automatically
   });
-
-  if (res.status === 401) {
-    // Session expired — force logout
-    useAdminStore.getState().adminLogout();
-    throw new AdminApiError(401, 'Admin session expired');
-  }
 
   if (!res.ok) {
     let detail = 'Unknown error';
@@ -56,6 +40,10 @@ async function adminRequest<T>(
       detail = body.detail || body.message || JSON.stringify(body);
     } catch {
       detail = res.statusText;
+    }
+    // Only show "session expired" for 401 on non-login endpoints
+    if (res.status === 401 && !path.includes('/auth/login')) {
+      throw new AdminApiError(401, 'Admin session expired');
     }
     throw new AdminApiError(res.status, detail);
   }
@@ -79,14 +67,18 @@ export interface AdminUserResponse {
 
 export interface AdminLoginResponse {
   admin: AdminUserResponse;
-  access_token: string;
 }
 
 export const adminAuthApi = {
-  login: (data: { email: string; password: string }) =>
+  login: (data: { email: string; password: string; totp_code?: string }) =>
     adminRequest<AdminLoginResponse>('/api/admin/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  logout: () =>
+    adminRequest<{ ok: boolean }>('/api/admin/auth/logout', {
+      method: 'POST',
     }),
 };
 

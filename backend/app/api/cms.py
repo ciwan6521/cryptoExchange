@@ -1,6 +1,6 @@
 """Public CMS routes — active content for user-facing pages."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, and_
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/cms", tags=["cms"])
 @router.get("/active")
 async def get_active_cms(db: AsyncSession = Depends(get_db)):
     """Get all currently active CMS content (public endpoint)."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     result = await db.execute(
         select(CMSContent).where(
             CMSContent.is_active == True,

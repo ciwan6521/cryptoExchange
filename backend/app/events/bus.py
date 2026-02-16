@@ -13,7 +13,7 @@ Celery workers subscribe to these events and trigger campaign evaluation.
 
 import json
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
 
@@ -45,7 +45,7 @@ class EventBus:
 
         event = {
             "type": event_type,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             **data,
         }
         # Publish to channel

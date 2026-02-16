@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import { tradingApi, type OrderItem, type UserTradeItem, ApiError } from '@/lib/api';
+import { tradingApi, ordersApi, type OrderItem, type UserTradeItem, type PlaceOrderRequest, type PlaceOrderResponse, ApiError } from '@/lib/api';
 
 // ============================================
-// Order Store — read-only user orders & trades
-// Backend is the source of truth. No mutations.
+// Order Store — user orders, trades, placement
+// Backend is the source of truth for all state.
 // ============================================
 
 interface OrderState {
@@ -22,14 +22,21 @@ interface OrderState {
   userTradesTotal: number;
   userTradesLoading: boolean;
 
+  // Order placement
+  placing: boolean;
+  placementError: string | null;
+  lastPlacement: PlaceOrderResponse | null;
+
   // Actions
+  placeOrder: (data: PlaceOrderRequest) => Promise<PlaceOrderResponse>;
+  cancelOrder: (orderId: string) => Promise<void>;
   fetchOpenOrders: (symbol?: string) => Promise<void>;
   fetchOrderHistory: (params?: { symbol?: string; limit?: number; offset?: number }) => Promise<void>;
   fetchUserTrades: (params?: { symbol?: string; limit?: number; offset?: number }) => Promise<void>;
   clear: () => void;
 }
 
-export const useOrderStore = create<OrderState>((set) => ({
+export const useOrderStore = create<OrderState>((set, get) => ({
   openOrders: [],
   openOrdersLoading: false,
   openOrdersError: null,
@@ -41,6 +48,38 @@ export const useOrderStore = create<OrderState>((set) => ({
   userTrades: [],
   userTradesTotal: 0,
   userTradesLoading: false,
+
+  placing: false,
+  placementError: null,
+  lastPlacement: null,
+
+  placeOrder: async (data: PlaceOrderRequest) => {
+    set({ placing: true, placementError: null });
+    try {
+      const res = await ordersApi.place(data);
+      set({ lastPlacement: res, placing: false });
+      // Refresh open orders after placement
+      get().fetchOpenOrders(data.symbol);
+      return res;
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.detail : 'Order placement failed';
+      set({ placementError: msg, placing: false });
+      throw e;
+    }
+  },
+
+  cancelOrder: async (orderId: string) => {
+    try {
+      await ordersApi.cancel(orderId);
+      // Remove from local open orders immediately
+      set((s) => ({
+        openOrders: s.openOrders.filter((o) => o.id !== orderId),
+      }));
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.detail : 'Cancel failed';
+      throw new Error(msg);
+    }
+  },
 
   fetchOpenOrders: async (symbol?: string) => {
     set({ openOrdersLoading: true, openOrdersError: null });

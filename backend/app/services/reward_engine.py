@@ -15,7 +15,7 @@ All reward distribution goes through LedgerService — no direct balance writes.
 
 import uuid
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select, func as sqlfunc, and_
@@ -65,15 +65,15 @@ class RewardEngine:
         if not campaign_types:
             return []
 
-        # 1. Find matching active campaigns
-        now = datetime.utcnow()
+        # 1. Find matching active campaigns (with row lock to prevent budget race)
+        now = datetime.now(timezone.utc)
         result = await self.db.execute(
             select(Campaign).where(
                 Campaign.status == "active",
                 Campaign.campaign_type.in_(campaign_types),
                 Campaign.start_date <= now,
                 Campaign.end_date > now,
-            )
+            ).with_for_update()
         )
         campaigns = list(result.scalars().all())
 
@@ -160,7 +160,7 @@ class RewardEngine:
 
         # g) Daily cap check
         if campaign.daily_cap and campaign.daily_cap > Decimal("0"):
-            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             daily_result = await self.db.execute(
                 select(sqlfunc.coalesce(sqlfunc.sum(CampaignClaim.reward_amount), Decimal("0"))).where(
                     CampaignClaim.campaign_id == campaign.id,
@@ -222,7 +222,7 @@ class RewardEngine:
             reward_asset=campaign.reward_asset,
             ledger_tx_id=tx_id,
             idempotency_key=idempotency_key,
-            claimed_at=datetime.utcnow(),
+            claimed_at=datetime.now(timezone.utc),
         )
         self.db.add(claim)
 
@@ -287,8 +287,8 @@ class RewardEngine:
         if segment == "all":
             return True
         elif segment == "new_users":
-            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-            return user.created_at.replace(tzinfo=None) > thirty_days_ago
+            thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+            return user.created_at > thirty_days_ago
         elif segment == "verified":
             return user.kyc_status == "approved"
         elif segment == "vip":
@@ -296,6 +296,6 @@ class RewardEngine:
         elif segment == "inactive":
             if user.last_login_at is None:
                 return True
-            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-            return user.last_login_at.replace(tzinfo=None) < thirty_days_ago
+            thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+            return user.last_login_at < thirty_days_ago
         return False

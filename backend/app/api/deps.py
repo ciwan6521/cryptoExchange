@@ -40,7 +40,7 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     payload = decode_token(token, token_type="user")
-    if not payload or payload.get("type") not in ("user", "refresh"):
+    if not payload or payload.get("type") != "user":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
     user_id = payload.get("sub")
@@ -59,14 +59,26 @@ async def get_current_user(
 
 
 async def get_current_admin(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> AdminUser:
-    """Extract and validate admin from JWT Bearer token."""
-    if not credentials:
+    """Extract and validate admin from httpOnly cookie (primary) or Bearer header (fallback)."""
+    token = None
+
+    # 1. Try httpOnly cookie first
+    cookie_token = request.cookies.get("admin_access_token")
+    if cookie_token:
+        token = cookie_token
+
+    # 2. Fallback to Bearer header (for Swagger testing)
+    if not token and credentials:
+        token = credentials.credentials
+
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    payload = decode_token(credentials.credentials, token_type="admin")
+    payload = decode_token(token, token_type="admin")
     if not payload or payload.get("type") != "admin":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired admin token")
 

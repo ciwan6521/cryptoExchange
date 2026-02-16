@@ -1,6 +1,7 @@
 """Admin user management routes."""
 
 import uuid
+import hashlib
 from decimal import Decimal
 from typing import Optional
 
@@ -14,6 +15,7 @@ from app.models.cms import AuditLog
 from app.api.deps import get_current_admin, get_ledger_service, require_admin_role
 from app.services.ledger_service import LedgerService
 from app.schemas.ledger import AdminCreditDebitRequest
+from app.config import settings
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
@@ -42,6 +44,8 @@ async def list_users(
 ):
     query = select(User).order_by(User.created_at.desc()).limit(limit).offset(offset)
     if search:
+        # Sanitize: limit length, strip SQL wildcards
+        search = search[:100].replace("%", "").replace("_", "")
         query = query.where(
             User.email.ilike(f"%{search}%") | User.username.ilike(f"%{search}%")
         )
@@ -132,8 +136,19 @@ async def admin_credit_user(
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
+    # Admin self-protection: large credits require super_admin
+    large_threshold = Decimal(settings.ADMIN_LARGE_CREDIT_THRESHOLD)
+    is_large = amount >= large_threshold
+    if is_large and admin.role != "super_admin":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Credits >= {large_threshold} USDT require super_admin role",
+        )
+
     ledger = LedgerService(db)
-    idempotency_key = f"admin_credit:{admin.id}:{user_id}:{body.asset}:{uuid.uuid4()}"
+    # Deterministic idempotency key — prevents double-credit on retry
+    key_input = f"admin_credit:{admin.id}:{user_id}:{body.asset}:{body.amount}:{body.reason}"
+    idempotency_key = f"admin_credit:{hashlib.sha256(key_input.encode()).hexdigest()[:32]}"
 
     async with db.begin_nested():
         entry = await ledger.credit(
@@ -150,13 +165,16 @@ async def admin_credit_user(
     log = AuditLog(
         admin_id=admin.id, action="admin_credit",
         target_type="user", target_id=user_id,
-        details={"asset": body.asset, "amount": body.amount, "reason": body.reason},
+        details={
+            "asset": body.asset, "amount": body.amount, "reason": body.reason,
+            "large_operation": is_large,
+        },
         ip_address=request.client.host if request.client else None,
     )
     db.add(log)
     await db.commit()
 
-    return {"ok": True, "amount": body.amount, "asset": body.asset}
+    return {"ok": True, "amount": body.amount, "asset": body.asset, "large_operation": is_large}
 
 
 @router.post("/{user_id}/debit")
@@ -177,8 +195,19 @@ async def admin_debit_user(
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
+    # Admin self-protection: large debits require super_admin
+    large_threshold = Decimal(settings.ADMIN_LARGE_CREDIT_THRESHOLD)
+    is_large = amount >= large_threshold
+    if is_large and admin.role != "super_admin":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Debits >= {large_threshold} USDT require super_admin role",
+        )
+
     ledger = LedgerService(db)
-    idempotency_key = f"admin_debit:{admin.id}:{user_id}:{body.asset}:{uuid.uuid4()}"
+    # Deterministic idempotency key — prevents double-debit on retry
+    key_input = f"admin_debit:{admin.id}:{user_id}:{body.asset}:{body.amount}:{body.reason}"
+    idempotency_key = f"admin_debit:{hashlib.sha256(key_input.encode()).hexdigest()[:32]}"
 
     try:
         async with db.begin_nested():
@@ -198,10 +227,13 @@ async def admin_debit_user(
     log = AuditLog(
         admin_id=admin.id, action="admin_debit",
         target_type="user", target_id=user_id,
-        details={"asset": body.asset, "amount": body.amount, "reason": body.reason},
+        details={
+            "asset": body.asset, "amount": body.amount, "reason": body.reason,
+            "large_operation": is_large,
+        },
         ip_address=request.client.host if request.client else None,
     )
     db.add(log)
     await db.commit()
 
-    return {"ok": True, "amount": body.amount, "asset": body.asset}
+    return {"ok": True, "amount": body.amount, "asset": body.asset, "large_operation": is_large}

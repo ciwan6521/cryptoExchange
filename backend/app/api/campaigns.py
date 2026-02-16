@@ -2,7 +2,7 @@
 Campaign API routes — public active campaigns + user claim history.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/campaigns", tags=["campaigns"])
 @router.get("/active", response_model=CampaignListResponse)
 async def get_active_campaigns(db: AsyncSession = Depends(get_db)):
     """Get all currently active campaigns (public endpoint)."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     result = await db.execute(
         select(Campaign).where(
             Campaign.status == "active",
