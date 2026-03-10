@@ -18,6 +18,7 @@ import {
   LogOut,
   ChevronLeft,
   CreditCard,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminStore, type AdminPermissions } from '@/stores/admin-store';
@@ -55,6 +56,7 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: 'Configuration',
     items: [
       { name: 'Markets', href: '/admin/markets', icon: BarChart3, permission: 'canManageMarkets' },
+      { name: 'Deposit Methods', href: '/admin/deposit-methods', icon: Building2, permission: 'canManageMarkets' },
       { name: 'System Flags', href: '/admin/flags', icon: Flag, permission: 'canManageFlags' },
       { name: 'Campaigns', href: '/admin/campaigns', icon: Megaphone, permission: 'canManageCampaigns' },
       { name: 'CMS', href: '/admin/cms', icon: FileText, permission: 'canManageCMS' },
@@ -126,7 +128,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="w-6 h-6 rounded bg-red-500/80 flex items-center justify-center">
             <Shield className="w-3.5 h-3.5 text-white" />
           </div>
-          <span className="text-sm font-semibold text-white">Nexus Admin</span>
+          <span className="text-sm font-semibold text-white">Crypto4Pro Admin</span>
         </div>
 
         {/* Navigation */}

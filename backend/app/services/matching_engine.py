@@ -37,7 +37,7 @@ from app.models.trading import TradingPair, Order, Trade
 from app.models.user import User
 from app.services.ledger_service import LedgerService, InsufficientBalanceError
 
-logger = logging.getLogger("nexus.matching")
+logger = logging.getLogger("crypto4pro.matching")
 
 
 class OrderError(Exception):

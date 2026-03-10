@@ -1,5 +1,5 @@
 // ============================================
-// Core Trading Types for Nexus Exchange
+// Core Trading Types for Crypto4Pro
 // ============================================
 
 // Market & Trading Pair Types

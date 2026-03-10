@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.ledger import Account, LedgerEntry, BalanceSnapshot
 from app.models.cms import SystemFlag, AuditLog
 
-logger = logging.getLogger("nexus.reconciliation")
+logger = logging.getLogger("crypto4pro.reconciliation")
 
 
 async def run_reconciliation(db: AsyncSession) -> dict:

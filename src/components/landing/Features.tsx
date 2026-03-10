@@ -103,7 +103,7 @@ export const Features: React.FC = () => {
           className="text-center mb-16"
         >
           <span className="inline-block px-4 py-1.5 text-sm font-medium text-brand-400 bg-brand-500/10 rounded-full mb-4">
-            Why Nexus
+            Why Crypto4Pro
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-white mb-4">
             Built for Serious Traders

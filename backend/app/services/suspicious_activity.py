@@ -23,7 +23,7 @@ from app.models.user import User
 from app.models.wallet import Withdrawal
 from app.models.cms import AuditLog
 
-logger = logging.getLogger("nexus.suspicious")
+logger = logging.getLogger("crypto4pro.suspicious")
 
 
 async def check_suspicious_withdrawal(

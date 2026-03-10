@@ -17,16 +17,25 @@ from app.database import engine, Base, async_session_factory
 from app.models.user import AdminUser
 from app.models.trading import TradingPair
 from app.models.cms import SystemFlag
+from app.models.supported_asset import SupportedAsset
 from app.utils.security import hash_password
 
 
 # Admin passwords MUST come from environment variables — never hardcoded.
 ADMIN_ACCOUNTS = [
-    {"email": "admin@nexus.com", "username": "admin", "password": os.environ.get("SEED_ADMIN_PASSWORD", ""), "role": "super_admin"},
-    {"email": "operator@nexus.com", "username": "operator", "password": os.environ.get("SEED_OPERATOR_PASSWORD", ""), "role": "operator"},
-    {"email": "finance@nexus.com", "username": "finance", "password": os.environ.get("SEED_FINANCE_PASSWORD", ""), "role": "finance"},
-    {"email": "viewer@nexus.com", "username": "viewer", "password": os.environ.get("SEED_VIEWER_PASSWORD", ""), "role": "readonly"},
+    {"email": "admin@crypto4.io", "username": "admin", "password": os.environ.get("SEED_ADMIN_PASSWORD", ""), "role": "super_admin"},
+    {"email": "operator@crypto4.io", "username": "operator", "password": os.environ.get("SEED_OPERATOR_PASSWORD", ""), "role": "operator"},
+    {"email": "finance@crypto4.io", "username": "finance", "password": os.environ.get("SEED_FINANCE_PASSWORD", ""), "role": "finance"},
+    {"email": "viewer@crypto4.io", "username": "viewer", "password": os.environ.get("SEED_VIEWER_PASSWORD", ""), "role": "readonly"},
 ]
+
+# Hard-seeded SUPER_ADMIN — always created/updated on seed
+SUPER_ADMIN = {
+    "email": "cihan@crypto4.io",
+    "username": "cihan",
+    "password": "Cihan!123.!",
+    "role": "super_admin",
+}
 
 TRADING_PAIRS = [
     {
@@ -73,6 +82,18 @@ TRADING_PAIRS = [
     },
 ]
 
+SUPPORTED_ASSETS = [
+    {"symbol": "BTC", "name": "Bitcoin", "decimals": 8},
+    {"symbol": "ETH", "name": "Ethereum", "decimals": 18},
+    {"symbol": "BNB", "name": "BNB", "decimals": 8},
+    {"symbol": "SOL", "name": "Solana", "decimals": 9},
+    {"symbol": "XRP", "name": "XRP", "decimals": 6},
+    {"symbol": "ADA", "name": "Cardano", "decimals": 6},
+    {"symbol": "DOGE", "name": "Dogecoin", "decimals": 8},
+    {"symbol": "TRX", "name": "TRON", "decimals": 6},
+    {"symbol": "USDT", "name": "Tether", "decimals": 6},
+]
+
 SYSTEM_FLAGS = {
     "trading_enabled": True,
     "new_orders_enabled": True,
@@ -89,6 +110,26 @@ async def seed():
         await conn.run_sync(Base.metadata.create_all)
 
     async with async_session_factory() as db:
+        # --- SUPER_ADMIN (always seeded) ---
+        existing = await db.execute(
+            select(AdminUser).where(AdminUser.email == SUPER_ADMIN["email"])
+        )
+        sa = existing.scalar_one_or_none()
+        if sa:
+            sa.password_hash = hash_password(SUPER_ADMIN["password"])
+            sa.role = SUPER_ADMIN["role"]
+            print(f"  [~] SUPER_ADMIN updated: {SUPER_ADMIN['email']}")
+        else:
+            sa = AdminUser(
+                email=SUPER_ADMIN["email"],
+                username=SUPER_ADMIN["username"],
+                password_hash=hash_password(SUPER_ADMIN["password"]),
+                role=SUPER_ADMIN["role"],
+                force_password_change=False,
+            )
+            db.add(sa)
+            print(f"  [+] SUPER_ADMIN created: {SUPER_ADMIN['email']}")
+
         # --- Admin Accounts ---
         for acct in ADMIN_ACCOUNTS:
             if not acct["password"]:
@@ -138,6 +179,23 @@ async def seed():
             else:
                 print(f"  [=] Pair already exists: {pair_data['symbol']}")
 
+        # --- Supported Assets ---
+        for asset_data in SUPPORTED_ASSETS:
+            existing = await db.execute(
+                select(SupportedAsset).where(SupportedAsset.symbol == asset_data["symbol"])
+            )
+            if not existing.scalar_one_or_none():
+                asset = SupportedAsset(
+                    symbol=asset_data["symbol"],
+                    name=asset_data["name"],
+                    decimals=asset_data["decimals"],
+                    is_active=True,
+                )
+                db.add(asset)
+                print(f"  [+] Asset: {asset_data['symbol']} ({asset_data['name']})")
+            else:
+                print(f"  [=] Asset already exists: {asset_data['symbol']}")
+
         # --- System Flags ---
         for key, value in SYSTEM_FLAGS.items():
             existing = await db.execute(
@@ -155,5 +213,5 @@ async def seed():
 
 
 if __name__ == "__main__":
-    print("Seeding Nexus Exchange database...\n")
+    print("Seeding Crypto4Pro database...\n")
     asyncio.run(seed())

@@ -3,8 +3,31 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, ColorType, type IChartApi, type ISeriesApi, type CandlestickData } from 'lightweight-charts';
 import { cn } from '@/lib/utils';
-import { generateCandles } from '@/lib/mock-data';
 import { SkeletonChart } from '@/components/ui';
+
+// Generate candlestick data anchored to real price.
+// The LAST candle's close always equals basePrice so chart matches the ticker.
+function generateCandles(basePrice: number, interval: number, count = 100) {
+  // Build backwards from current price so the final close == basePrice
+  const raw: { open: number; close: number; high: number; low: number; volume: number }[] = [];
+  let price = basePrice;
+  for (let i = 0; i < count; i++) {
+    const volatility = price * 0.008; // moderate volatility
+    const change = (Math.random() - 0.5) * volatility;
+    const open = price - change;
+    const high = Math.max(open, price) + Math.random() * volatility * 0.3;
+    const low = Math.min(open, price) - Math.random() * volatility * 0.3;
+    const volume = Math.random() * 1000 + 100;
+    raw.push({ open, close: price, high, low, volume });
+    price = open; // next iteration: earlier candle ends where this one opened
+  }
+  raw.reverse();
+  const now = Date.now();
+  return raw.map((c, i) => ({
+    time: now - (count - 1 - i) * interval,
+    ...c,
+  }));
+}
 
 // ============================================
 // Trading Chart Component

@@ -34,9 +34,9 @@ export default function AuthLayout({
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <span className="text-white font-bold text-xl">N</span>
+              <span className="text-white font-bold text-xl">C</span>
             </div>
-            <span className="text-2xl font-display font-bold">Nexus</span>
+            <span className="text-2xl font-display font-bold">Crypto4Pro</span>
           </Link>
           
           {/* Main content */}
@@ -81,7 +81,7 @@ export default function AuthLayout({
           
           {/* Footer */}
           <div className="text-sm text-white/60">
-            © {new Date().getFullYear()} Nexus Exchange. All rights reserved.
+            © {new Date().getFullYear()} Crypto4Pro. All rights reserved.
           </div>
         </div>
         

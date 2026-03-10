@@ -4,17 +4,17 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: nexus-postgres
+    container_name: crypto4pro-postgres
     environment:
-      POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: nexus_password
-      POSTGRES_DB: nexus_exchange
+      POSTGRES_USER: crypto4pro
+      POSTGRES_PASSWORD: crypto4pro_password
+      POSTGRES_DB: crypto4pro_exchange
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_exchange"]
+      test: ["CMD-SHELL", "pg_isready -U crypto4pro -d crypto4pro_exchange"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,7 +22,7 @@ services:
   # Redis (cache, event bus, Celery broker)
   redis:
     image: redis:7-alpine
-    container_name: nexus-redis
+    container_name: crypto4pro-redis
     ports:
       - "6379:6379"
     volumes:
@@ -38,7 +38,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nexus-api
+    container_name: crypto4pro-api
     ports:
       - "8000:8000"
     env_file:
@@ -57,7 +57,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nexus-celery-worker
+    container_name: crypto4pro-celery-worker
     env_file:
       - .env
     depends_on:
@@ -74,7 +74,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nexus-celery-beat
+    container_name: crypto4pro-celery-beat
     env_file:
       - .env
     depends_on:

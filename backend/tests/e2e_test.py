@@ -32,7 +32,7 @@ def main():
 
     # --- Register user2 ---
     r = c.post("/api/auth/register", json={
-        "email": "trader2@nexus.com", "username": "trader2", "password": "Trader2Pass!@"
+        "email": "trader2@crypto4.io", "username": "trader2", "password": "Trader2Pass!@"
     })
     if r.status_code == 200:
         print("[+] Registered trader2")
@@ -40,12 +40,12 @@ def main():
         print(f"[=] trader2 registration: {r.status_code} {r.text[:100]}")
 
     # --- Login both users ---
-    r1 = c.post("/api/auth/login", json={"email": "test@nexus.com", "password": "TestPass123!@"})
+    r1 = c.post("/api/auth/login", json={"email": "test@crypto4.io", "password": "TestPass123!@"})
     t1 = get_token(r1)
     h1 = auth_headers(t1)
     print(f"[+] User1 logged in")
 
-    r2 = c.post("/api/auth/login", json={"email": "trader2@nexus.com", "password": "Trader2Pass!@"})
+    r2 = c.post("/api/auth/login", json={"email": "trader2@crypto4.io", "password": "Trader2Pass!@"})
     t2 = get_token(r2)
     h2 = auth_headers(t2)
     print(f"[+] User2 logged in")
@@ -57,7 +57,7 @@ def main():
 
     async def fund_user2():
         async with async_session_factory() as db:
-            result = await db.execute(select(User).where(User.email == "trader2@nexus.com"))
+            result = await db.execute(select(User).where(User.email == "trader2@crypto4.io"))
             u2 = result.scalar_one()
             ledger = LedgerService(db)
             await ledger.credit(u2.id, "BTC", Decimal("5"), "deposit", idempotency_key="fund-trader2-btc")

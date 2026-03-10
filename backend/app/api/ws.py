@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session_factory
 from app.models.trading import TradingPair, Order, Trade
 
-logger = logging.getLogger("nexus.ws")
+logger = logging.getLogger("crypto4pro.ws")
 
 router = APIRouter()
 

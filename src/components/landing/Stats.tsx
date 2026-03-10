@@ -15,7 +15,7 @@ const stats = [
     value: 5.2,
     suffix: 'M+',
     label: 'Active Traders',
-    description: 'Trust Nexus for their trading needs',
+    description: 'Trust Crypto4Pro for their trading needs',
   },
   {
     value: 128,

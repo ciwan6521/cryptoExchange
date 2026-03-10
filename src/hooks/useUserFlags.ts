@@ -29,23 +29,19 @@ const DEFAULT_FLAGS: UserFlags = {
 
 export function useUserFlags(): UserFlags {
   const authUser = useAuthStore((s) => s.user);
-  const mockUsers = useAdminStore((s) => s.mockUsers);
+  const systemFlags = useAdminStore((s) => s.systemFlags);
 
   return useMemo(() => {
-    if (!authUser?.email || !Array.isArray(mockUsers)) return DEFAULT_FLAGS;
+    if (!authUser?.email) return DEFAULT_FLAGS;
 
-    const matched = mockUsers.find(
-      (u) => u.email.toLowerCase() === authUser.email.toLowerCase()
-    );
-
-    if (!matched) return DEFAULT_FLAGS;
-
+    // Derive per-user flags from system-level flags.
+    // When a real backend is connected, fetch per-user overrides from the API.
     return {
-      userTradingEnabled: matched.tradingEnabled,
-      userWithdrawalsEnabled: matched.withdrawalsEnabled,
-      userEnabled: matched.enabled,
-      forceLoggedOut: matched.forceLoggedOut,
-      passwordResetPending: matched.passwordResetPending,
+      userTradingEnabled: systemFlags.tradingEnabled,
+      userWithdrawalsEnabled: systemFlags.withdrawalsEnabled,
+      userEnabled: true,
+      forceLoggedOut: false,
+      passwordResetPending: false,
     };
-  }, [authUser, mockUsers]);
+  }, [authUser, systemFlags]);
 }

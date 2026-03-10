@@ -23,10 +23,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://nexus.exchange'),
+  metadataBase: new URL('https://crypto4pro.io'),
   title: {
-    default: 'Nexus Exchange | Trade Crypto with Confidence',
-    template: '%s | Nexus Exchange',
+    default: 'Crypto4Pro | Trade Crypto with Confidence',
+    template: '%s | Crypto4Pro',
   },
   description:
     'The next generation cryptocurrency exchange. Trade BTC, ETH, and 200+ cryptocurrencies with industry-leading security and performance.',
@@ -38,14 +38,14 @@ export const metadata: Metadata = {
     'defi',
     'trading platform',
   ],
-  authors: [{ name: 'Nexus Exchange' }],
-  creator: 'Nexus Exchange',
+  authors: [{ name: 'Crypto4Pro' }],
+  creator: 'Crypto4Pro',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://nexus.exchange',
-    siteName: 'Nexus Exchange',
-    title: 'Nexus Exchange | Trade Crypto with Confidence',
+    url: 'https://crypto4pro.io',
+    siteName: 'Crypto4Pro',
+    title: 'Crypto4Pro | Trade Crypto with Confidence',
     description:
       'The next generation cryptocurrency exchange. Trade BTC, ETH, and 200+ cryptocurrencies.',
     images: [
@@ -53,13 +53,13 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Nexus Exchange',
+        alt: 'Crypto4Pro',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Nexus Exchange | Trade Crypto with Confidence',
+    title: 'Crypto4Pro | Trade Crypto with Confidence',
     description: 'The next generation cryptocurrency exchange.',
     images: ['/og-image.png'],
   },
@@ -104,7 +104,7 @@ export default function RootLayout({
         <Providers>{children}</Providers>
         
         {/* Performance hint - preconnect to API */}
-        <link rel="preconnect" href="https://api.nexus.exchange" />
+        <link rel="preconnect" href="https://api.crypto4pro.io" />
       </body>
     </html>
   );

@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.cms import AuditLog
 
-logger = logging.getLogger("nexus.critical")
+logger = logging.getLogger("crypto4pro.critical")
 
 
 async def log_critical_event(

@@ -10,7 +10,7 @@ import time
 import logging
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-logger = logging.getLogger("nexus.access")
+logger = logging.getLogger("crypto4pro.access")
 
 
 class RequestLoggingMiddleware:

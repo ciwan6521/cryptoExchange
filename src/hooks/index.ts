@@ -6,7 +6,7 @@ import type { TradingPair, Orderbook, Trade, PerformanceMetrics } from '@/types'
 import { useTradingStore, selectTicker, selectOrderbook, selectTrades, selectAllTickers } from '@/stores/trading-store';
 
 // ============================================
-// Custom Hooks for Nexus Exchange
+// Custom Hooks for Crypto4Pro
 // ============================================
 
 export { useUserFlags } from './useUserFlags';

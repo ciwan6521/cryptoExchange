@@ -42,7 +42,7 @@ const socialLinks = [
   { name: 'Twitter', href: 'https://twitter.com', icon: Twitter },
   { name: 'GitHub', href: 'https://github.com', icon: Github },
   { name: 'Discord', href: 'https://discord.com', icon: MessageCircle },
-  { name: 'Email', href: 'mailto:support@nexus.com', icon: Mail },
+  { name: 'Email', href: 'mailto:support@crypto4.io', icon: Mail },
 ];
 
 interface FooterProps {
@@ -55,7 +55,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
       <footer className="py-6 px-4 border-t border-glass-border">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-500">
-            © {new Date().getFullYear()} Nexus Exchange. All rights reserved.
+            © {new Date().getFullYear()} Crypto4Pro. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             {socialLinks.map((link) => (
@@ -85,10 +85,10 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
           <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-6 lg:mb-0">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-                <span className="text-white font-bold text-lg">N</span>
+                <span className="text-white font-bold text-lg">C</span>
               </div>
               <span className="text-xl font-display font-bold text-white">
-                Nexus
+                Crypto4Pro
               </span>
             </div>
             <p className="text-sm text-gray-400 mb-6 max-w-xs">
@@ -185,7 +185,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
         {/* Bottom bar */}
         <div className="py-6 border-t border-glass-border flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-500">
-            © {new Date().getFullYear()} Nexus Exchange. All rights reserved.
+            © {new Date().getFullYear()} Crypto4Pro. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <ConnectionDot className="text-sm" />

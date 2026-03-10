@@ -15,7 +15,7 @@ from celery.schedules import crontab
 from app.config import settings
 
 celery = Celery(
-    "nexus",
+    "crypto4pro",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
 )

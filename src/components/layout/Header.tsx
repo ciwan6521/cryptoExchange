@@ -59,10 +59,10 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">N</span>
+              <span className="text-white font-bold text-lg">C</span>
             </div>
             <span className="text-xl font-display font-bold text-white hidden sm:block">
-              Nexus
+              Crypto4Pro
             </span>
           </Link>
           

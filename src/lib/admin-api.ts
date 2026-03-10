@@ -327,6 +327,72 @@ export interface AuditLogItem {
   created_at: string;
 }
 
+// ============================================
+// Admin Deposit Methods
+// ============================================
+
+export interface DepositMethodItem {
+  id: string;
+  method_type: 'crypto_wallet' | 'bank_transfer';
+  label: string;
+  asset: string | null;
+  network: string | null;
+  address: string | null;
+  memo_tag: string | null;
+  bank_name: string | null;
+  account_holder: string | null;
+  iban: string | null;
+  swift_code: string | null;
+  currency: string | null;
+  reference_note: string | null;
+  notes: string | null;
+  min_amount: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string | null;
+}
+
+export interface DepositMethodCreateData {
+  method_type: 'crypto_wallet' | 'bank_transfer';
+  label: string;
+  asset?: string;
+  network?: string;
+  address?: string;
+  memo_tag?: string;
+  bank_name?: string;
+  account_holder?: string;
+  iban?: string;
+  swift_code?: string;
+  currency?: string;
+  reference_note?: string;
+  notes?: string;
+  min_amount?: string;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export const adminDepositMethodsApi = {
+  list: () =>
+    adminRequest<{ methods: DepositMethodItem[] }>('/api/admin/deposit-methods'),
+
+  create: (data: DepositMethodCreateData) =>
+    adminRequest<DepositMethodItem>('/api/admin/deposit-methods', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<DepositMethodCreateData>) =>
+    adminRequest<{ ok: boolean; method: DepositMethodItem }>(
+      `/api/admin/deposit-methods/${id}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+    ),
+
+  delete: (id: string) =>
+    adminRequest<{ ok: boolean }>(`/api/admin/deposit-methods/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
 export const adminLogsApi = {
   list: (params?: { action?: string; target_type?: string; limit?: number; offset?: number }) => {
     const sp = new URLSearchParams();

@@ -34,7 +34,7 @@ export const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({ chil
               Under Maintenance
             </h1>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              Nexus Exchange is currently undergoing scheduled maintenance.
+              Crypto4Pro is currently undergoing scheduled maintenance.
               We&apos;ll be back shortly. Thank you for your patience.
             </p>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-gray-500">

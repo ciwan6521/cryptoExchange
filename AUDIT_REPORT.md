@@ -1,4 +1,4 @@
-# NEXUS EXCHANGE — FULL SYSTEM AUDIT REPORT
+# CRYPTO4PRO — FULL SYSTEM AUDIT REPORT
 
 **Date:** 2026-02-15
 **Auditor:** Cascade (AI Security & Architecture Audit)
@@ -261,7 +261,7 @@ No Redis Sentinel or Cluster. Redis failure = event bus down + Celery down + rat
 Every API call hits the database. No Redis caching for: trading pairs, system flags, user balances
 
 ### E4. Celery Event Queue is Unbounded
-`nexus:event_queue` Redis list has no max length. Under high load, memory exhaustion possible
+`crypto4pro:event_queue` Redis list has no max length. Under high load, memory exhaustion possible
 
 ### E5. No Database Connection Pooling (PgBouncer)
 Direct connections from app to PostgreSQL. Under high concurrency, connection exhaustion

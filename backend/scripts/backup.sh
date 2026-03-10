@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# Nexus Exchange — PostgreSQL Backup Script
+# Crypto4Pro — PostgreSQL Backup Script
 #
 # PURPOSE:
 #   Creates a timestamped, compressed backup of the exchange database.
@@ -16,7 +16,7 @@
 #   PGPASSWORD=xxx ./scripts/backup.sh
 #
 # CRON (daily at 3 AM UTC):
-#   0 3 * * * /opt/nexus/backend/scripts/backup.sh >> /var/log/nexus-backup.log 2>&1
+#   0 3 * * * /opt/crypto4pro/backend/scripts/backup.sh >> /var/log/crypto4pro-backup.log 2>&1
 #
 # RESTORE:
 #   See restore instructions at bottom of this file.
@@ -27,11 +27,11 @@ set -euo pipefail
 # ── Configuration ──────────────────────────────────────────
 DB_HOST="${PGHOST:-localhost}"
 DB_PORT="${PGPORT:-5432}"
-DB_NAME="${PGDATABASE:-nexus_exchange}"
-DB_USER="${PGUSER:-nexus}"
+DB_NAME="${PGDATABASE:-crypto4pro_exchange}"
+DB_USER="${PGUSER:-crypto4pro}"
 # PGPASSWORD should be set via environment variable or .pgpass file
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/nexus}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/crypto4pro}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 TIMESTAMP=$(date -u +"%Y%m%d_%H%M%S_UTC")
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.sql.gz"
@@ -86,25 +86,25 @@ echo "[$(date -u)] Backup complete. ${REMAINING} backups retained."
 # ============================================================
 #
 # 1. VERIFY BACKUP INTEGRITY:
-#    gunzip -t /var/backups/nexus/nexus_exchange_20260215_030000_UTC.sql.gz
+#    gunzip -t /var/backups/crypto4pro/crypto4pro_exchange_20260215_030000_UTC.sql.gz
 #
 # 2. RESTORE TO EXISTING DATABASE (destructive — drops all tables first):
-#    gunzip -c /var/backups/nexus/nexus_exchange_20260215_030000_UTC.sql.gz \
-#      | psql -h localhost -U nexus -d nexus_exchange
+#    gunzip -c /var/backups/crypto4pro/crypto4pro_exchange_20260215_030000_UTC.sql.gz \
+#      | psql -h localhost -U crypto4pro -d crypto4pro_exchange
 #
 # 3. RESTORE TO A NEW DATABASE (safe — for verification):
-#    createdb -h localhost -U nexus nexus_exchange_restored
-#    gunzip -c /var/backups/nexus/nexus_exchange_20260215_030000_UTC.sql.gz \
-#      | psql -h localhost -U nexus -d nexus_exchange_restored
+#    createdb -h localhost -U crypto4pro crypto4pro_exchange_restored
+#    gunzip -c /var/backups/crypto4pro/crypto4pro_exchange_20260215_030000_UTC.sql.gz \
+#      | psql -h localhost -U crypto4pro -d crypto4pro_exchange_restored
 #
 # 4. VERIFY RESTORED DATA:
-#    psql -h localhost -U nexus -d nexus_exchange_restored -c "
+#    psql -h localhost -U crypto4pro -d crypto4pro_exchange_restored -c "
 #      SELECT asset, COUNT(*), SUM(available + locked) as total
 #      FROM accounts GROUP BY asset;
 #    "
 #
 # 5. VERIFY LEDGER INTEGRITY AFTER RESTORE:
-#    psql -h localhost -U nexus -d nexus_exchange_restored -c "
+#    psql -h localhost -U crypto4pro -d crypto4pro_exchange_restored -c "
 #      SELECT le.asset,
 #             SUM(CASE WHEN entry_type='credit' THEN amount ELSE 0 END) -
 #             SUM(CASE WHEN entry_type='debit' THEN amount ELSE 0 END) as ledger_net,
@@ -117,6 +117,6 @@ echo "[$(date -u)] Backup complete. ${REMAINING} backups retained."
 # 6. POINT-IN-TIME RECOVERY (requires WAL archiving — not in this script):
 #    For sub-daily recovery, configure PostgreSQL WAL archiving:
 #    - archive_mode = on
-#    - archive_command = 'cp %p /var/backups/nexus/wal/%f'
+#    - archive_command = 'cp %p /var/backups/crypto4pro/wal/%f'
 #    Then use pg_basebackup + WAL replay.
 # ============================================================

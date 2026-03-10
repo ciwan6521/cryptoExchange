@@ -68,7 +68,7 @@ async def _drain_queue():
     try:
         # Process up to 100 events per cycle
         for _ in range(100):
-            event_json = await r.rpop("nexus:event_queue")
+            event_json = await r.rpop("crypto4pro:event_queue")
             if not event_json:
                 break
 

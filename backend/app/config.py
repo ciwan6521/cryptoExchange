@@ -5,13 +5,13 @@ import os
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "nexus-exchange"
+    APP_NAME: str = "crypto4pro"
     APP_ENV: str = "production"
     DEBUG: bool = False
     SECRET_KEY: str = "change-me-to-a-random-64-char-string"
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://nexus:nexus_password@localhost:5432/nexus_exchange"
+    DATABASE_URL: str = "postgresql+asyncpg://crypto4pro:crypto4pro_password@localhost:5432/crypto4pro"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

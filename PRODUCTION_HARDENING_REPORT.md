@@ -1,4 +1,4 @@
-# Production Hardening Report — Nexus Exchange
+# Production Hardening Report — Crypto4Pro
 
 **Date:** 2026-02-15
 **Scope:** Final infrastructure hardening before real-money operations
@@ -357,7 +357,7 @@ POST-DEPLOYMENT
     GET /api/health → db: ok, redis: ok, celery: ok
 
 MONITORING
-[ ] Set up log shipping for nexus.critical logger
+[ ] Set up log shipping for crypto4pro.critical logger
 [ ] Set up alert on ledger_mismatch_detected flag
 [ ] Set up alert on health endpoint returning 503
 [ ] Schedule daily reconciliation (cron or Celery beat)

@@ -1,0 +1,28 @@
+# ============================================
+# Docker Compose for Crypto4Pro
+# Maps to port 3012 on host (3000-3011 occupied)
+# ============================================
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crypto4pro
+    restart: unless-stopped
+    ports:
+      - "3012:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

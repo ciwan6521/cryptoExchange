@@ -14,18 +14,18 @@ async def create_admin():
         # Check if admin exists
         from sqlalchemy import select
         result = await db.execute(
-            select(AdminUser).where(AdminUser.email == "admin@nexus.com")
+            select(AdminUser).where(AdminUser.email == "admin@crypto4.io")
         )
         existing = result.scalar_one_or_none()
         
         if existing:
-            print("[!] Admin already exists: admin@nexus.com")
+            print("[!] Admin already exists: admin@crypto4.io")
             return
         
         # Create admin
         admin = AdminUser(
             id=uuid.uuid4(),
-            email="admin@nexus.com",
+            email="admin@crypto4.io",
             username="admin",
             password_hash=hash_password("Admin123!"),
             role="super_admin",
@@ -34,7 +34,7 @@ async def create_admin():
         )
         db.add(admin)
         await db.commit()
-        print("[+] Created admin: admin@nexus.com / Admin123!")
+        print("[+] Created admin: admin@crypto4.io / Admin123!")
 
 if __name__ == "__main__":
     asyncio.run(create_admin())

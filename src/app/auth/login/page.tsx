@@ -79,9 +79,9 @@ export default function LoginPage() {
       <div className="lg:hidden mb-8 text-center">
         <Link href="/" className="inline-flex items-center gap-2">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-            <span className="text-white font-bold text-xl">N</span>
+            <span className="text-white font-bold text-xl">C</span>
           </div>
-          <span className="text-2xl font-display font-bold text-white">Nexus</span>
+          <span className="text-2xl font-display font-bold text-white">Crypto4Pro</span>
         </Link>
       </div>
       

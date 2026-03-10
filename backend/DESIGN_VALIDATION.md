@@ -263,12 +263,12 @@ STEP 1 — API Handler (app/api/auth.py:register)
 
 STEP 2 — Event Publication (app/api/auth.py:68-71)
   • EventBus.publish_user_registered(user_id, email)
-  • Redis: LPUSH "nexus:event_queue" {type: "user_registered", user_id, data: {email}}
+  • Redis: LPUSH "crypto4pro:event_queue" {type: "user_registered", user_id, data: {email}}
   • Non-blocking: if Redis is down, registration still succeeds
 
 STEP 3 — Celery Worker (app/tasks/campaign_tasks.py:62-86)
   • process_event_queue() runs every 5 seconds (Celery beat)
-  • RPOP from "nexus:event_queue"
+  • RPOP from "crypto4pro:event_queue"
   • Calls RewardEngine.evaluate(event)
 
 STEP 4 — Campaign Matching (app/services/reward_engine.py:68-78)

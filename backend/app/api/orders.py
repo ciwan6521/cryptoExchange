@@ -13,7 +13,7 @@ import traceback as tb_module
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
-logger = logging.getLogger("nexus.orders")
+logger = logging.getLogger("crypto4pro.orders")
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession

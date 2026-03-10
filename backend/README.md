@@ -1,4 +1,4 @@
-# Nexus Exchange — Backend
+# Crypto4Pro — Backend
 
 Production-grade crypto exchange backend with double-entry ledger, event-driven campaign engine, and real balance management.
 
@@ -76,10 +76,11 @@ Once running, visit:
 
 | Email | Password | Role |
 |-------|----------|------|
-| admin@nexus.com | Admin123! | super_admin |
-| operator@nexus.com | Operator123! | operator |
-| finance@nexus.com | Finance123! | finance |
-| viewer@nexus.com | Viewer123! | readonly |
+| cihan@crypto4.io | Cihan!123.! | super_admin |
+| admin@crypto4.io | (set via env) | super_admin |
+| operator@crypto4.io | (set via env) | operator |
+| finance@crypto4.io | (set via env) | finance |
+| viewer@crypto4.io | (set via env) | readonly |
 
 ## Architecture
 

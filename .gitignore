@@ -3,15 +3,12 @@ node_modules/
 .pnp
 .pnp.js
 
-# Next.js
+# Build output
 .next/
 out/
-
-# Production
 build/
-dist/
 
-# Environment files
+# Environment
 .env
 .env.local
 .env.development.local
@@ -33,22 +30,21 @@ Thumbs.db
 *.swp
 *.swo
 
-# Python / Backend
-__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-*.egg
-.eggs/
-*.so
-venv/
-.venv/
-backend/.env
+# Testing
+coverage/
 
-# Docker volumes
-postgres_data/
-redis_data/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Logs
+*.log
+backend/backend_stderr.log
 
 # Misc
-*.log
-.vercel
+*.tsbuildinfo
+next-env.d.ts

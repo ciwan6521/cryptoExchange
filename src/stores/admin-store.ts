@@ -224,7 +224,7 @@ export const useAdminStore = create<AdminState>()(
       },
     }),
     {
-      name: 'nexus-admin',
+      name: 'crypto4pro-admin',
       // Only persist admin profile and session state — NEVER tokens
       partialize: (state) => ({
         isAdminAuthenticated: state.isAdminAuthenticated,

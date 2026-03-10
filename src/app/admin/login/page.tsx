@@ -104,7 +104,7 @@ export default function AdminLoginPage() {
             <Shield className="w-6 h-6 text-red-400" />
           </div>
           <h1 className="text-lg font-semibold text-white">Admin Panel</h1>
-          <p className="text-xs text-gray-600 mt-1">Nexus Exchange — Restricted Access</p>
+          <p className="text-xs text-gray-600 mt-1">Crypto4Pro — Restricted Access</p>
         </div>
 
         {/* Credentials Step */}
@@ -118,7 +118,7 @@ export default function AdminLoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@nexus.com"
+                  placeholder="admin@crypto4.io"
                   required
                   autoFocus
                   className="w-full h-9 pl-9 pr-3 text-sm bg-white/[0.03] border border-white/[0.08] rounded-lg text-white placeholder-gray-700 focus:outline-none focus:border-red-500/40 focus:ring-1 focus:ring-red-500/20"

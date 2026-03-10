@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+.env*.local
+.vscode
+.idea
+deploy
+backend
+coverage
+.DS_Store
+Thumbs.db

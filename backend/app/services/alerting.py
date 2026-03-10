@@ -21,7 +21,7 @@ import httpx
 
 from app.config import settings
 
-logger = logging.getLogger("nexus.alerting")
+logger = logging.getLogger("crypto4pro.alerting")
 
 # Webhook URL from environment (optional)
 ALERT_WEBHOOK_URL: Optional[str] = getattr(settings, "ALERT_WEBHOOK_URL", None)
@@ -72,7 +72,7 @@ async def send_alert(
                     {"title": k, "value": str(v), "short": True}
                     for k, v in (details or {}).items()
                 ],
-                "footer": f"Nexus Exchange | {settings.APP_ENV}",
+                "footer": f"Crypto4Pro | {settings.APP_ENV}",
                 "ts": timestamp,
             }
         ],

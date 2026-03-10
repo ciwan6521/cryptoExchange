@@ -52,7 +52,7 @@ curl http://localhost:8000/api/health
 
 Expected:
 ```json
-{"status": "ok", "service": "nexus-exchange", "env": "development"}
+{"status": "ok", "service": "crypto4pro", "env": "development"}
 ```
 
 ---
@@ -62,7 +62,7 @@ Expected:
 ```bash
 curl -X POST http://localhost:8000/api/admin/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "admin@nexus.com", "password": "Admin123!"}'
+  -d '{"email": "cihan@crypto4.io", "password": "Cihan!123.!"}'
 ```
 
 Expected: Returns `admin` object + `access_token`. Save the token:

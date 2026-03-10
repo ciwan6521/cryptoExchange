@@ -476,3 +476,50 @@ export const cmsApi = {
       end_date: string | null;
     }> }>('/api/cms/active'),
 };
+
+// ============================================
+// Wallet API
+// ============================================
+
+export interface WalletAsset {
+  symbol: string;
+  name: string;
+  available: string;
+  locked: string;
+  total: string;
+  price_usd: string | null;
+  value_usd: string | null;
+}
+
+export interface WalletResponse {
+  assets: WalletAsset[];
+  total_value_usd: string | null;
+}
+
+export interface MarketPrices {
+  prices: Record<string, string | null>;
+}
+
+export interface TickerData {
+  price: string;
+  change: string;
+  high: string;
+  low: string;
+  volume: string;
+  quoteVolume: string;
+}
+
+export interface TickersResponse {
+  tickers: Record<string, TickerData>;
+}
+
+export const walletApi = {
+  getWallet: () =>
+    request<WalletResponse>('/api/wallet/me'),
+
+  getPrices: () =>
+    request<MarketPrices>('/api/market/prices'),
+
+  getTickers: () =>
+    request<TickersResponse>('/api/market/tickers'),
+};

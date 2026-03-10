@@ -11,34 +11,34 @@ import { Footer } from '@/components/layout';
 
 // Page-level metadata (supplements root layout)
 export const metadata: Metadata = {
-  title: 'Nexus Exchange — Trade Crypto with Confidence',
+  title: 'Crypto4Pro — Trade Crypto with Confidence',
   description:
     'The next generation cryptocurrency exchange. Institutional-grade security, lightning-fast execution, deep liquidity, and 200+ cryptocurrencies. Start trading in under 5 minutes.',
   alternates: {
-    canonical: 'https://nexus.exchange',
+    canonical: 'https://crypto4.pro',
   },
   openGraph: {
-    title: 'Nexus Exchange — Trade Crypto with Confidence',
+    title: 'Crypto4Pro — Trade Crypto with Confidence',
     description:
       'Institutional-grade crypto trading. 200+ assets, bank-grade security, 24/7 support.',
-    url: 'https://nexus.exchange',
-    siteName: 'Nexus Exchange',
+    url: 'https://crypto4.pro',
+    siteName: 'Crypto4Pro',
     type: 'website',
     images: [
       {
-        url: 'https://nexus.exchange/og-image.png',
+        url: 'https://crypto4.pro/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Nexus Exchange — Trade Crypto with Confidence',
+        alt: 'Crypto4Pro — Trade Crypto with Confidence',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Nexus Exchange — Trade Crypto with Confidence',
+    title: 'Crypto4Pro — Trade Crypto with Confidence',
     description:
       'Institutional-grade crypto trading. 200+ assets, bank-grade security, 24/7 support.',
-    images: ['https://nexus.exchange/og-image.png'],
+    images: ['https://crypto4.pro/og-image.png'],
   },
 };
 
@@ -47,8 +47,8 @@ function JsonLd() {
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
-    name: 'Nexus Exchange',
-    url: 'https://nexus.exchange',
+    name: 'Crypto4Pro',
+    url: 'https://crypto4.pro',
     description:
       'The next generation cryptocurrency exchange with institutional-grade security and deep liquidity.',
     applicationCategory: 'FinanceApplication',

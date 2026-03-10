@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Standalone output for Docker — produces minimal server bundle
+  output: 'standalone',
+
   // Enable React strict mode for better development experience
   reactStrictMode: true,
   

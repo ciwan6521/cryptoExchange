@@ -29,6 +29,8 @@ import { useBalanceStore } from '@/stores/balance-store';
 import { useOrderStore } from '@/stores/order-store';
 import { useUserFlags } from '@/hooks/useUserFlags';
 import { CMSBanners } from '@/components/layout/CMSRenderer';
+import { DepositModal } from '@/components/modals/DepositModal';
+import { WithdrawModal } from '@/components/modals/WithdrawModal';
 
 // ============================================
 // Dashboard Page
@@ -38,6 +40,8 @@ import { CMSBanners } from '@/components/layout/CMSRenderer';
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [balanceHidden, setBalanceHidden] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const tickers = useTickers();
   const { depositsEnabled, withdrawalsEnabled } = useAdminStore((s) => s.systemFlags);
   const { userWithdrawalsEnabled } = useUserFlags();
@@ -148,12 +152,12 @@ export default function DashboardPage() {
                 {/* Quick actions */}
                 <div className="flex items-center gap-3">
                   {isEnabled('ENABLE_DEPOSIT') && (
-                    <Button variant="secondary" icon={<Plus className="w-4 h-4" />} disabled={!depositsEnabled}>
+                    <Button variant="secondary" icon={<Plus className="w-4 h-4" />} disabled={!depositsEnabled} onClick={() => setDepositOpen(true)}>
                       {depositsEnabled ? 'Deposit' : 'Deposits Paused'}
                     </Button>
                   )}
                   {isEnabled('ENABLE_WITHDRAW') && (
-                    <Button variant="secondary" icon={<Send className="w-4 h-4" />} disabled={!withdrawalsEnabled || !userWithdrawalsEnabled}>
+                    <Button variant="secondary" icon={<Send className="w-4 h-4" />} disabled={!withdrawalsEnabled || !userWithdrawalsEnabled} onClick={() => setWithdrawOpen(true)}>
                       {!withdrawalsEnabled ? 'Withdrawals Paused' : !userWithdrawalsEnabled ? 'Withdrawals Restricted' : 'Withdraw'}
                     </Button>
                   )}
@@ -470,6 +474,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+      {/* Modals */}
+      <DepositModal isOpen={depositOpen} onClose={() => setDepositOpen(false)} />
+      <WithdrawModal isOpen={withdrawOpen} onClose={() => setWithdrawOpen(false)} />
     </div>
   );
 }

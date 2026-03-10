@@ -1,5 +1,5 @@
 """
-Shared test fixtures for Nexus Exchange tests.
+Shared test fixtures for Crypto4Pro tests.
 
 Uses an in-memory SQLite database for fast, isolated tests.
 Each test gets a fresh database with all tables created.

@@ -20,7 +20,10 @@ import {
 import { Header, Sidebar } from '@/components/layout';
 import { Card, CardHeader, Button, Input, Badge, Modal } from '@/components/ui';
 import { cn, formatTime } from '@/lib/utils';
-import { MOCK_SESSIONS } from '@/lib/mock-data';
+// Session data — will be fetched from backend when sessions API is available
+const PLACEHOLDER_SESSIONS = [
+  { id: 'current', device: 'Current Browser', ip: '—', location: '—', lastActive: Date.now(), current: true },
+];
 import { isEnabled } from '@/lib/feature-flags';
 
 // ============================================
@@ -274,7 +277,7 @@ function SecuritySettings() {
         />
         
         <div className="mt-4 space-y-3">
-          {MOCK_SESSIONS.map((session) => (
+          {PLACEHOLDER_SESSIONS.map((session) => (
             <div
               key={session.id}
               className={cn(
@@ -334,7 +337,7 @@ function SecuritySettings() {
             </div>
             <p className="text-sm text-gray-400">No API keys created yet</p>
             <p className="text-xs text-gray-500 mt-1">
-              Create an API key to access the Nexus API
+              Create an API key to access the Crypto4Pro API
             </p>
           </div>
         </Card>
@@ -501,7 +504,7 @@ function AppearanceSettings() {
     <Card>
       <CardHeader
         title="Appearance"
-        subtitle="Customize how Nexus looks"
+        subtitle="Customize how Crypto4Pro looks"
       />
       
       <div className="mt-6 space-y-6">

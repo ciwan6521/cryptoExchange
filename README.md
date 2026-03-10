@@ -1,8 +1,8 @@
-# Nexus Exchange
+# Crypto4Pro
 
 A modern, professional, high-performance crypto exchange frontend built with Next.js 14, React, TypeScript, and Tailwind CSS.
 
-![Nexus Exchange](https://via.placeholder.com/1200x630/0a0b0c/14b8a6?text=Nexus+Exchange)
+![Crypto4Pro](https://via.placeholder.com/1200x630/0a0b0c/14b8a6?text=Crypto4Pro)
 
 ## 🚀 Features
 
@@ -112,10 +112,10 @@ src/
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nexus-exchange.git
+git clone https://github.com/yourusername/crypto4pro.git
 
 # Navigate to project directory
-cd nexus-exchange
+cd crypto4pro
 
 # Install dependencies
 npm install
@@ -130,8 +130,8 @@ Create a `.env.local` file:
 
 ```env
 # API Configuration
-NEXT_PUBLIC_API_URL=https://api.nexus.exchange
-NEXT_PUBLIC_WS_URL=wss://ws.nexus.exchange
+NEXT_PUBLIC_API_URL=https://api.crypto4.pro
+NEXT_PUBLIC_WS_URL=wss://ws.crypto4.pro
 
 # Analytics (optional)
 NEXT_PUBLIC_GA_ID=
@@ -193,8 +193,8 @@ vercel
 ### Docker
 
 ```bash
-docker build -t nexus-exchange .
-docker run -p 3000:3000 nexus-exchange
+docker build -t crypto4pro .
+docker run -p 3000:3000 crypto4pro
 ```
 
 ## 🔐 Security Features
@@ -227,5 +227,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Built with ❤️ by the Nexus Team
+Built with ❤️ by the Crypto4Pro Team
 

@@ -76,10 +76,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             <div className="h-16 px-4 flex items-center justify-between border-b border-glass-border">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">N</span>
+                  <span className="text-white font-bold text-lg">C</span>
                 </div>
                 <span className="text-xl font-display font-bold text-white">
-                  Nexus
+                  Crypto4Pro
                 </span>
               </div>
               <IconButton variant="ghost" onClick={onClose} aria-label="Close menu">

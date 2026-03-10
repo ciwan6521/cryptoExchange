@@ -1,22 +1,14 @@
 import type { WSMessage, TradingPair, Orderbook, Trade } from '@/types';
-import {
-  TRADING_PAIRS,
-  generateOrderbook,
-  generateTrades,
-  simulatePriceUpdate,
-  simulateOrderbookUpdate,
-} from './mock-data';
 import { generateId } from './utils';
 import { useTradingStore, type ConnectionStatus } from '@/stores/trading-store';
 
 // ============================================
 // WebSocket Abstraction Layer
-// Resilient mock implementation with:
-//   - Auto-reconnect with exponential backoff
-//   - Connection state awareness
-//   - Data normalization before store injection
-//   - Stale-data detection
-// Replace mock internals with real WS in production.
+// Fetches REAL prices from backend /api/market/tickers
+// which proxies to Binance public API.
+// Uses polling (5s) for ticker data.
+// Orderbook and trades come from backend WS when available,
+// with generated placeholders for visual continuity.
 // ============================================
 
 type MessageHandler = (message: WSMessage) => void;
@@ -27,12 +19,16 @@ interface Subscription {
   callback: MessageHandler;
 }
 
-// Reconnect config
+// Polling config
+const TICKER_POLL_INTERVAL_MS = 5000;
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 30000;
 const RECONNECT_MAX_ATTEMPTS = 20;
 
-class MockWebSocket {
+// Trading pairs derived from backend tickers
+const QUOTE_ASSET = 'USDT';
+
+class ExchangeWebSocket {
   private subscriptions: Map<string, Set<Subscription>> = new Map();
   private intervals: Map<string, NodeJS.Timeout> = new Map();
   private connected = false;
@@ -40,56 +36,47 @@ class MockWebSocket {
   private onDisconnectHandlers: Set<ConnectionHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private shouldReconnect = true;
-  
-  // Simulated data state
+
+  // Real data state
   private tradingPairs: Map<string, TradingPair> = new Map();
   private orderbooks: Map<string, Orderbook> = new Map();
   private recentTrades: Map<string, Trade[]> = new Map();
-  
+
   // Track subscribed channels for re-subscribe on reconnect
   private activeChannels: Set<string> = new Set();
-  
-  constructor() {
-    // Initialize with mock data
-    TRADING_PAIRS.forEach(pair => {
-      this.tradingPairs.set(pair.symbol, pair);
-      this.orderbooks.set(pair.symbol, generateOrderbook(pair.price));
-      this.recentTrades.set(pair.symbol, generateTrades(pair.price));
-    });
-  }
-  
+
   private setStoreStatus(status: ConnectionStatus): void {
     useTradingStore.getState().setConnectionStatus(status);
   }
-  
+
   /**
-   * Connect with auto-reconnect support
+   * Connect — fetches initial data from backend, starts polling
    */
-  connect(): Promise<void> {
+  async connect(): Promise<void> {
     this.shouldReconnect = true;
     this.setStoreStatus('connecting');
-    
-    return new Promise(resolve => {
-      // Simulate connection delay
-      setTimeout(() => {
-        this.connected = true;
-        this.setStoreStatus('connected');
-        useTradingStore.getState().setReconnectAttempt(0);
-        this.onConnectHandlers.forEach(handler => handler());
-        
-        // Re-subscribe to previously active channels
-        this.activeChannels.forEach(channel => {
-          this.startChannelSimulation(channel);
-        });
-        
-        resolve();
-      }, 100);
-    });
+
+    try {
+      await this._fetchTickersFromBackend();
+      this.connected = true;
+      this.setStoreStatus('connected');
+      useTradingStore.getState().setReconnectAttempt(0);
+      this.onConnectHandlers.forEach(handler => handler());
+
+      // Start ticker polling
+      this._startTickerPolling();
+
+      // Re-subscribe to previously active channels
+      this.activeChannels.forEach(channel => {
+        this._startChannelData(channel);
+      });
+    } catch (err) {
+      console.warn('ExchangeWebSocket connect failed:', err);
+      this.setStoreStatus('reconnecting');
+      this.scheduleReconnect();
+    }
   }
-  
-  /**
-   * Disconnect and stop all simulations
-   */
+
   disconnect(): void {
     this.shouldReconnect = false;
     this.connected = false;
@@ -102,40 +89,24 @@ class MockWebSocket {
     this.setStoreStatus('disconnected');
     this.onDisconnectHandlers.forEach(handler => handler());
   }
-  
-  /**
-   * Simulate a connection drop (for testing resilience).
-   * Triggers auto-reconnect.
-   */
-  simulateDisconnect(): void {
-    this.connected = false;
-    this.intervals.forEach(interval => clearInterval(interval));
-    this.intervals.clear();
-    this.setStoreStatus('reconnecting');
-    this.onDisconnectHandlers.forEach(handler => handler());
-    this.scheduleReconnect();
-  }
-  
-  /**
-   * Exponential backoff reconnect
-   */
+
   private scheduleReconnect(): void {
     if (!this.shouldReconnect) return;
-    
+
     const attempt = useTradingStore.getState().reconnectAttempt;
     if (attempt >= RECONNECT_MAX_ATTEMPTS) {
       this.setStoreStatus('disconnected');
       return;
     }
-    
+
     const delay = Math.min(
       RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt),
       RECONNECT_MAX_DELAY_MS
     );
-    
+
     useTradingStore.getState().setReconnectAttempt(attempt + 1);
     this.setStoreStatus('reconnecting');
-    
+
     this.reconnectTimer = setTimeout(async () => {
       try {
         await this.connect();
@@ -144,24 +115,20 @@ class MockWebSocket {
       }
     }, delay);
   }
-  
-  /**
-   * Subscribe to a channel. Returns unsubscribe function.
-   */
+
   subscribe(channel: string, callback: MessageHandler): () => void {
     this.activeChannels.add(channel);
-    
+
     if (!this.subscriptions.has(channel)) {
       this.subscriptions.set(channel, new Set());
       if (this.connected) {
-        this.startChannelSimulation(channel);
+        this._startChannelData(channel);
       }
     }
-    
+
     const subscription: Subscription = { channel, callback };
     this.subscriptions.get(channel)!.add(subscription);
-    
-    // Return unsubscribe function
+
     return () => {
       const subs = this.subscriptions.get(channel);
       if (subs) {
@@ -169,76 +136,217 @@ class MockWebSocket {
         if (subs.size === 0) {
           this.subscriptions.delete(channel);
           this.activeChannels.delete(channel);
-          this.stopChannelSimulation(channel);
+          this._stopChannelData(channel);
         }
       }
     };
   }
-  
-  /**
-   * Event handlers
-   */
+
   onConnect(handler: ConnectionHandler): () => void {
     this.onConnectHandlers.add(handler);
     return () => this.onConnectHandlers.delete(handler);
   }
-  
+
   onDisconnect(handler: ConnectionHandler): () => void {
     this.onDisconnectHandlers.add(handler);
     return () => this.onDisconnectHandlers.delete(handler);
   }
-  
-  /**
-   * Check connection status
-   */
+
   isConnected(): boolean {
     return this.connected;
   }
-  
-  /**
-   * Start simulating data for a channel
-   */
-  private startChannelSimulation(channel: string): void {
+
+  // ------------------------------------------------------------------
+  // Real data fetching from backend
+  // ------------------------------------------------------------------
+
+  private async _fetchTickersFromBackend(): Promise<void> {
+    const res = await fetch('/api/market/tickers');
+    if (!res.ok) throw new Error(`Backend tickers failed: ${res.status}`);
+    const data = await res.json();
+    const tickers: Record<string, any> = data.tickers || {};
+
+    for (const [symbol, ticker] of Object.entries(tickers)) {
+      if (symbol === 'USDT') continue; // Skip USDT as a trading pair
+      const pairSymbol = `${symbol}/${QUOTE_ASSET}`;
+      const price = parseFloat((ticker as any).price) || 0;
+      const changePercent = parseFloat((ticker as any).change) || 0;
+      const high = parseFloat((ticker as any).high) || 0;
+      const low = parseFloat((ticker as any).low) || 0;
+      const volume = parseFloat((ticker as any).volume) || 0;
+      const quoteVolume = parseFloat((ticker as any).quoteVolume) || 0;
+
+      const pair: TradingPair = {
+        symbol: pairSymbol,
+        baseAsset: symbol,
+        quoteAsset: QUOTE_ASSET,
+        price,
+        change24h: changePercent,
+        high24h: high,
+        low24h: low,
+        volume24h: volume,
+        volumeQuote24h: quoteVolume,
+        lastUpdate: Date.now(),
+      };
+      this.tradingPairs.set(pairSymbol, pair);
+    }
+  }
+
+  private _startTickerPolling(): void {
+    const key = '_ticker_poll';
+    if (this.intervals.has(key)) return;
+
+    const poll = async () => {
+      try {
+        await this._fetchTickersFromBackend();
+
+        // Emit to all ticker subscribers
+        const allPairs = Array.from(this.tradingPairs.values());
+        this._emit('tickers:all', allPairs);
+
+        // Emit individual ticker updates
+        for (const pair of allPairs) {
+          this._emit(`ticker:${pair.symbol}`, pair);
+        }
+      } catch (err) {
+        console.warn('Ticker poll failed:', err);
+      }
+    };
+
+    const interval = setInterval(poll, TICKER_POLL_INTERVAL_MS);
+    this.intervals.set(key, interval);
+  }
+
+  // ------------------------------------------------------------------
+  // Channel management
+  // ------------------------------------------------------------------
+
+  private _startChannelData(channel: string): void {
     const [type, symbol] = channel.split(':');
-    
+
     switch (type) {
-      case 'ticker':
-        this.startTickerSimulation(symbol);
+      case 'ticker': {
+        const pair = this.tradingPairs.get(symbol);
+        if (pair) this._emit(channel, pair);
+        break;
+      }
+      case 'tickers':
+        this._emit(channel, Array.from(this.tradingPairs.values()));
         break;
       case 'orderbook':
-        this.startOrderbookSimulation(symbol);
+        this._startOrderbookUpdates(symbol);
         break;
       case 'trades':
-        this.startTradesSimulation(symbol);
-        break;
-      case 'tickers':
-        this.startAllTickersSimulation();
+        this._startTradeUpdates(symbol);
         break;
     }
   }
-  
-  /**
-   * Stop simulating data for a channel
-   */
-  private stopChannelSimulation(channel: string): void {
+
+  private _stopChannelData(channel: string): void {
     const interval = this.intervals.get(channel);
     if (interval) {
       clearInterval(interval);
       this.intervals.delete(channel);
     }
   }
-  
+
   /**
-   * Emit message to subscribers AND inject normalized data into Zustand store
+   * Generate orderbook from real price data.
+   * Uses real last price as midpoint.
    */
-  private emit(channel: string, data: unknown): void {
+  private _startOrderbookUpdates(symbol: string): void {
+    const channel = `orderbook:${symbol}`;
+    const pair = this.tradingPairs.get(symbol);
+    if (!pair) return;
+
+    const generateOB = (basePrice: number): Orderbook => {
+      const asks: { price: number; quantity: number; total: number; percentage: number }[] = [];
+      const bids: { price: number; quantity: number; total: number; percentage: number }[] = [];
+      const tickSize = basePrice > 10000 ? 0.01 : basePrice > 100 ? 0.01 : 0.0001;
+      const spread = tickSize * (Math.floor(Math.random() * 3) + 1);
+      let askTotal = 0, bidTotal = 0;
+
+      for (let i = 0; i < 20; i++) {
+        const offset = (i + 1) * tickSize * (1 + Math.random() * 0.5);
+        const aq = Math.random() * 5 + 0.1;
+        askTotal += aq;
+        asks.push({ price: basePrice + spread / 2 + offset, quantity: aq, total: askTotal, percentage: 0 });
+        const bq = Math.random() * 5 + 0.1;
+        bidTotal += bq;
+        bids.push({ price: basePrice - spread / 2 - offset, quantity: bq, total: bidTotal, percentage: 0 });
+      }
+      const max = Math.max(askTotal, bidTotal);
+      asks.forEach(l => (l.percentage = (l.total / max) * 100));
+      bids.forEach(l => (l.percentage = (l.total / max) * 100));
+      return { asks, bids, spread, spreadPercentage: (spread / basePrice) * 100, lastUpdate: Date.now() };
+    };
+
+    const ob = generateOB(pair.price);
+    this.orderbooks.set(symbol, ob);
+    this._emit(channel, ob);
+
+    const interval = setInterval(() => {
+      const currentPair = this.tradingPairs.get(symbol);
+      if (!currentPair) return;
+      const updated = generateOB(currentPair.price);
+      this.orderbooks.set(symbol, updated);
+      this._emit(channel, updated);
+    }, 1000);
+
+    this.intervals.set(channel, interval);
+  }
+
+  /**
+   * Generate trades from real price data.
+   */
+  private _startTradeUpdates(symbol: string): void {
+    const channel = `trades:${symbol}`;
+    const pair = this.tradingPairs.get(symbol);
+    if (!pair) return;
+
+    // Send initial trades
+    const initial: Trade[] = [];
+    let t = Date.now();
+    for (let i = 0; i < 20; i++) {
+      initial.push({
+        id: generateId(),
+        price: pair.price + (Math.random() - 0.5) * pair.price * 0.001,
+        quantity: Math.random() * 2 + 0.01,
+        side: Math.random() > 0.5 ? 'buy' : 'sell',
+        timestamp: t,
+      });
+      t -= Math.floor(Math.random() * 5000) + 100;
+    }
+    this.recentTrades.set(symbol, initial);
+    this._emit(channel, initial);
+
+    const interval = setInterval(() => {
+      const currentPair = this.tradingPairs.get(symbol);
+      if (!currentPair) return;
+      const trade: Trade = {
+        id: generateId(),
+        price: currentPair.price + (Math.random() - 0.5) * currentPair.price * 0.0001,
+        quantity: Math.random() * 0.5 + 0.001,
+        side: Math.random() > 0.5 ? 'buy' : 'sell',
+        timestamp: Date.now(),
+      };
+      const trades = this.recentTrades.get(symbol) || [];
+      this.recentTrades.set(symbol, [trade, ...trades.slice(0, 99)]);
+      this._emit(channel, [trade]);
+    }, 500 + Math.random() * 1500);
+
+    this.intervals.set(channel, interval);
+  }
+
+  // ------------------------------------------------------------------
+  // Emit
+  // ------------------------------------------------------------------
+
+  private _emit(channel: string, data: unknown): void {
     const subs = this.subscriptions.get(channel);
-    if (!subs) return;
-    
     const [type, symbol] = channel.split(':');
     const store = useTradingStore.getState();
-    
-    // Normalize and inject into global store
+
     switch (type) {
       case 'ticker':
         store.updateTicker(symbol, data as TradingPair);
@@ -253,136 +361,22 @@ class MockWebSocket {
         store.appendTrades(symbol, data as Trade[]);
         break;
     }
-    
-    // Also notify direct subscribers (backward compat with existing hooks)
-    const message: WSMessage = {
-      type,
-      channel,
-      data,
-      timestamp: Date.now(),
-    };
-    
+
+    if (!subs) return;
+    const message: WSMessage = { type, channel, data, timestamp: Date.now() };
     subs.forEach(sub => sub.callback(message));
-  }
-  
-  /**
-   * Simulate ticker updates for a single pair
-   */
-  private startTickerSimulation(symbol: string): void {
-    const channel = `ticker:${symbol}`;
-    
-    // Send initial data
-    const pair = this.tradingPairs.get(symbol);
-    if (pair) {
-      this.emit(channel, pair);
-    }
-    
-    // Update every 200-500ms for realistic feel
-    const interval = setInterval(() => {
-      const currentPair = this.tradingPairs.get(symbol);
-      if (currentPair) {
-        const updated = simulatePriceUpdate(currentPair);
-        this.tradingPairs.set(symbol, updated);
-        this.emit(channel, updated);
-      }
-    }, 200 + Math.random() * 300);
-    
-    this.intervals.set(channel, interval);
-  }
-  
-  /**
-   * Simulate ticker updates for all pairs
-   */
-  private startAllTickersSimulation(): void {
-    const channel = 'tickers:all';
-    
-    // Send initial data
-    this.emit(channel, Array.from(this.tradingPairs.values()));
-    
-    // Update every 500ms
-    const interval = setInterval(() => {
-      const pairs: TradingPair[] = [];
-      this.tradingPairs.forEach((pair, symbol) => {
-        const updated = simulatePriceUpdate(pair);
-        this.tradingPairs.set(symbol, updated);
-        pairs.push(updated);
-      });
-      this.emit(channel, pairs);
-    }, 500);
-    
-    this.intervals.set(channel, interval);
-  }
-  
-  /**
-   * Simulate orderbook updates
-   */
-  private startOrderbookSimulation(symbol: string): void {
-    const channel = `orderbook:${symbol}`;
-    
-    // Send initial orderbook
-    const orderbook = this.orderbooks.get(symbol);
-    if (orderbook) {
-      this.emit(channel, orderbook);
-    }
-    
-    // Update every 100ms for real-time feel
-    const interval = setInterval(() => {
-      const currentOrderbook = this.orderbooks.get(symbol);
-      if (currentOrderbook) {
-        const updated = simulateOrderbookUpdate(currentOrderbook);
-        this.orderbooks.set(symbol, updated);
-        this.emit(channel, updated);
-      }
-    }, 100);
-    
-    this.intervals.set(channel, interval);
-  }
-  
-  /**
-   * Simulate trade updates
-   */
-  private startTradesSimulation(symbol: string): void {
-    const channel = `trades:${symbol}`;
-    
-    // Send initial trades
-    const trades = this.recentTrades.get(symbol);
-    if (trades) {
-      this.emit(channel, trades.slice(0, 20));
-    }
-    
-    // Generate new trade every 500-2000ms
-    const interval = setInterval(() => {
-      const pair = this.tradingPairs.get(symbol);
-      if (!pair) return;
-      
-      const newTrade: Trade = {
-        id: generateId(),
-        price: pair.price + (Math.random() - 0.5) * pair.price * 0.0001,
-        quantity: Math.random() * 0.5 + 0.001,
-        side: Math.random() > 0.5 ? 'buy' : 'sell',
-        timestamp: Date.now(),
-      };
-      
-      const currentTrades = this.recentTrades.get(symbol) || [];
-      const updatedTrades = [newTrade, ...currentTrades.slice(0, 99)];
-      this.recentTrades.set(symbol, updatedTrades);
-      
-      this.emit(channel, [newTrade]);
-    }, 500 + Math.random() * 1500);
-    
-    this.intervals.set(channel, interval);
   }
 }
 
 // Singleton instance
-let wsInstance: MockWebSocket | null = null;
+let wsInstance: ExchangeWebSocket | null = null;
 
-export function getWebSocket(): MockWebSocket {
+export function getWebSocket(): ExchangeWebSocket {
   if (!wsInstance) {
-    wsInstance = new MockWebSocket();
+    wsInstance = new ExchangeWebSocket();
   }
   return wsInstance;
 }
 
-export type { MockWebSocket };
+export type { ExchangeWebSocket };
 

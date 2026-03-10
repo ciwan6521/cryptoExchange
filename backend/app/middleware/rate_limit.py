@@ -52,7 +52,7 @@ async def check_rate_limit(
 async def rate_limit_auth(request: Request) -> None:
     """Rate limit for auth endpoints — stricter per-IP limit."""
     client_ip = request.client.host if request.client else "unknown"
-    key = f"nexus:ratelimit:auth:{client_ip}"
+    key = f"crypto4pro:ratelimit:auth:{client_ip}"
 
     allowed, remaining = await check_rate_limit(
         key,
@@ -70,7 +70,7 @@ async def rate_limit_auth(request: Request) -> None:
 async def rate_limit_orders(request: Request) -> None:
     """Rate limit for order placement — 30 per minute per user IP."""
     client_ip = request.client.host if request.client else "unknown"
-    key = f"nexus:ratelimit:orders:{client_ip}"
+    key = f"crypto4pro:ratelimit:orders:{client_ip}"
 
     allowed, remaining = await check_rate_limit(key, max_requests=30, window_seconds=60)
     if not allowed:
@@ -83,7 +83,7 @@ async def rate_limit_orders(request: Request) -> None:
 async def rate_limit_withdrawals(request: Request) -> None:
     """Rate limit for withdrawal requests — 5 per minute per IP."""
     client_ip = request.client.host if request.client else "unknown"
-    key = f"nexus:ratelimit:withdrawals:{client_ip}"
+    key = f"crypto4pro:ratelimit:withdrawals:{client_ip}"
 
     allowed, remaining = await check_rate_limit(key, max_requests=5, window_seconds=60)
     if not allowed:
@@ -96,7 +96,7 @@ async def rate_limit_withdrawals(request: Request) -> None:
 async def rate_limit_financial(request: Request) -> None:
     """General rate limit for financial endpoints — 60 per minute per IP."""
     client_ip = request.client.host if request.client else "unknown"
-    key = f"nexus:ratelimit:financial:{client_ip}"
+    key = f"crypto4pro:ratelimit:financial:{client_ip}"
 
     allowed, remaining = await check_rate_limit(
         key, max_requests=settings.RATE_LIMIT_PER_MINUTE, window_seconds=60

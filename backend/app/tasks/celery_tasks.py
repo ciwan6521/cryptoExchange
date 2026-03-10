@@ -10,7 +10,7 @@ import logging
 import asyncio
 from app.celery_app import celery
 
-logger = logging.getLogger("nexus.tasks")
+logger = logging.getLogger("crypto4pro.tasks")
 
 
 def _run_async(coro):

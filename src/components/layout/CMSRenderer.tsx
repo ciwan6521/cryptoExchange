@@ -101,7 +101,7 @@ export const CMSPopup: React.FC = () => {
   useEffect(() => {
     // Load dismissed popups from sessionStorage
     try {
-      const stored = sessionStorage.getItem('nexus-dismissed-popups');
+      const stored = sessionStorage.getItem('crypto4pro-dismissed-popups');
       if (stored) setDismissedIds(new Set(JSON.parse(stored)));
     } catch { /* ignore */ }
     setSessionReady(true);
@@ -125,7 +125,7 @@ export const CMSPopup: React.FC = () => {
     const next = new Set(dismissedIds).add(popup.id);
     setDismissedIds(next);
     try {
-      sessionStorage.setItem('nexus-dismissed-popups', JSON.stringify(Array.from(next)));
+      sessionStorage.setItem('crypto4pro-dismissed-popups', JSON.stringify(Array.from(next)));
     } catch { /* ignore */ }
   };
 

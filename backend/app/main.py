@@ -1,5 +1,5 @@
 """
-Nexus Exchange — FastAPI Application Entry Point
+Crypto4Pro — FastAPI Application Entry Point
 
 Production-grade crypto exchange backend with:
 - Double-entry ledger system
@@ -21,7 +21,7 @@ from app.database import engine, Base
 from app.events.bus import EventBus
 from app.middleware.request_logging import RequestLoggingMiddleware
 
-logger = logging.getLogger("nexus")
+logger = logging.getLogger("crypto4pro")
 
 # Import routers
 from app.api.auth import router as auth_router
@@ -41,11 +41,15 @@ from app.api.admin.markets import router as admin_markets_router
 from app.api.admin.logs import router as admin_logs_router
 from app.api.admin.withdrawals import router as admin_withdrawals_router
 from app.api.admin.reconciliation import router as admin_reconciliation_router
+from app.api.admin.wallet import router as admin_wallet_router
+from app.api.admin.deposit_methods import router as admin_deposit_methods_router
 
 # User withdrawal + orders routers
 from app.api.withdrawals import router as withdrawal_router
 from app.api.orders import router as orders_router
 from app.api.ws import router as ws_router
+from app.api.wallet import router as wallet_router
+from app.services.market_data import get_market_data_service
 
 
 @asynccontextmanager
@@ -58,9 +62,14 @@ async def lifespan(app: FastAPI):
     # Initialize event bus
     await EventBus.get_instance()
     
+    # Start market data background polling
+    market = get_market_data_service()
+    await market.start_polling()
+    
     yield
     
     # Shutdown
+    await market.close()
     await EventBus.close()
     await engine.dispose()
 
@@ -70,7 +79,7 @@ _docs_url = "/docs" if settings.DEBUG else None
 _redoc_url = "/redoc" if settings.DEBUG else None
 
 app = FastAPI(
-    title="Nexus Exchange API",
+    title="Crypto4Pro Exchange API",
     description="Production-grade crypto exchange backend",
     version="1.0.0",
     lifespan=lifespan,
@@ -118,6 +127,7 @@ app.include_router(trading_router)
 app.include_router(withdrawal_router)
 app.include_router(orders_router)
 app.include_router(ws_router)
+app.include_router(wallet_router)
 
 # Register routers — Admin
 app.include_router(admin_auth_router)
@@ -129,6 +139,8 @@ app.include_router(admin_markets_router)
 app.include_router(admin_logs_router)
 app.include_router(admin_withdrawals_router)
 app.include_router(admin_reconciliation_router)
+app.include_router(admin_wallet_router)
+app.include_router(admin_deposit_methods_router)
 
 
 @app.get("/api/health")

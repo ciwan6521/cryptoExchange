@@ -1,4 +1,4 @@
-# Security Hardening Report — Nexus Exchange
+# Security Hardening Report — Crypto4Pro
 
 **Date:** 2026-02-15
 **Scope:** All 17 issues from audit report — 3 phases completed.
@@ -207,7 +207,7 @@ SEED_VIEWER_PASSWORD=<strong-password-12-chars-min>
 ```
 
 ### Frontend localStorage Cleanup
-Users with existing `nexus-admin` localStorage entry will have stale `adminToken` field. The new store's `partialize` no longer includes it, so it will be ignored and overwritten on next persist.
+Users with existing `crypto4pro-admin` localStorage entry will have stale `adminToken` field. The new store's `partialize` no longer includes it, so it will be ignored and overwritten on next persist.
 
 ---
 

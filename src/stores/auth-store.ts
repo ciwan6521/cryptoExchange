@@ -118,7 +118,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'nexus-auth',
+      name: 'crypto4pro-auth',
       // Only persist user profile for instant hydration — NOT tokens
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,

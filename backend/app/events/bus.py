@@ -49,9 +49,9 @@ class EventBus:
             **data,
         }
         # Publish to channel
-        await self._redis.publish(f"nexus:events:{event_type}", json.dumps(event, default=str))
+        await self._redis.publish(f"crypto4pro:events:{event_type}", json.dumps(event, default=str))
         # Also push to a list for Celery consumption (reliable delivery)
-        await self._redis.lpush("nexus:event_queue", json.dumps(event, default=str))
+        await self._redis.lpush("crypto4pro:event_queue", json.dumps(event, default=str))
 
     async def publish_user_registered(self, user_id: str, email: str) -> None:
         await self.publish("user_registered", {
