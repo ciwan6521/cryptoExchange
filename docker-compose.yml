@@ -1,28 +1,180 @@
 # ============================================
-# Docker Compose for Crypto4Pro
-# Maps to port 3012 on host (3000-3011 occupied)
+# Crypto4Pro — Full Stack Production Compose
+# Frontend (3012) + Backend + PostgreSQL + Redis + Celery
+# All internal services on isolated network — only frontend exposed
 # ============================================
 
 services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: crypto4pro
+  # ── PostgreSQL ─────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: c4p-postgres
     restart: unless-stopped
-    ports:
-      - "3012:3000"
     environment:
-      - NODE_ENV=production
-      - NEXT_TELEMETRY_DISABLED=1
+      POSTGRES_USER: crypto4pro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto4pro_s3cur3_pwd_2026}
+      POSTGRES_DB: crypto4pro_exchange
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
-      interval: 30s
+      test: ["CMD-SHELL", "pg_isready -U crypto4pro -d crypto4pro_exchange"]
+      interval: 5s
       timeout: 5s
+      retries: 5
+    networks:
+      - c4p-internal
+
+  # ── Redis ──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: c4p-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - c4p-internal
+
+  # ── FastAPI Backend ────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: c4p-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - SECRET_KEY=${SECRET_KEY:-change-me-production-secret-64-chars-min}
+      - DATABASE_URL=postgresql+asyncpg://crypto4pro:${POSTGRES_PASSWORD:-crypto4pro_s3cur3_pwd_2026}@postgres:5432/crypto4pro_exchange
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-jwt-secret-key-prod-32chars}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+      - ADMIN_JWT_SECRET_KEY=${ADMIN_JWT_SECRET_KEY:-change-me-admin-jwt-secret-prod}
+      - ADMIN_JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - CORS_ORIGINS=["https://crypto4pro.io","https://www.crypto4pro.io"]
+      - ALLOWED_ORIGINS=["https://crypto4pro.io","https://www.crypto4pro.io"]
+      - RATE_LIMIT_PER_MINUTE=60
+      - ENABLE_BLOCKCHAIN_WALLET=false
+      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD:-}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+    networks:
+      - c4p-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ── Celery Worker ──────────────────────────
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: c4p-celery-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - SECRET_KEY=${SECRET_KEY:-change-me-production-secret-64-chars-min}
+      - DATABASE_URL=postgresql+asyncpg://crypto4pro:${POSTGRES_PASSWORD:-crypto4pro_s3cur3_pwd_2026}@postgres:5432/crypto4pro_exchange
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    networks:
+      - c4p-internal
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+
+  # ── Celery Beat ────────────────────────────
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: c4p-celery-beat
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - SECRET_KEY=${SECRET_KEY:-change-me-production-secret-64-chars-min}
+      - DATABASE_URL=postgresql+asyncpg://crypto4pro:${POSTGRES_PASSWORD:-crypto4pro_s3cur3_pwd_2026}@postgres:5432/crypto4pro_exchange
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    networks:
+      - c4p-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Next.js Frontend ───────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_BACKEND_URL=http://api:8000
+    container_name: c4p-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3012:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - NEXT_PUBLIC_BACKEND_URL=http://api:8000
+    networks:
+      - c4p-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  c4p-internal:
+    driver: bridge
