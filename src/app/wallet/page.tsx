@@ -310,7 +310,7 @@ export default function WalletPage() {
           {/* Info footer */}
           <div className="mt-6 flex items-center gap-2 text-xs text-gray-500">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>Prices from Binance, updated every 30 seconds. Balances are simulated.</span>
+            <span>Prices updated in real-time.</span>
           </div>
         </div>
       </main>
