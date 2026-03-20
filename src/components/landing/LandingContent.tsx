@@ -57,7 +57,7 @@ export function LandingHero() {
             width={180}
             height={50}
             className="object-contain"
-            style={{ width: 'auto', height: '40px' }}
+            style={{ width: 'auto', height: '60px' }}
             priority
           />
         </Link>

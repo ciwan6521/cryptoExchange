@@ -159,7 +159,7 @@ export default function RegisterPage() {
             width={160}
             height={45}
             className="object-contain"
-            style={{ width: 'auto', height: '36px' }}
+            style={{ width: 'auto', height: '40px' }}
             priority
           />
         </Link>

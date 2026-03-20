@@ -40,7 +40,7 @@ export default function AuthLayout({
               width={180}
               height={50}
               className="object-contain"
-              style={{ width: 'auto', height: '36px' }}
+              style={{ width: 'auto', height: '48px' }}
               priority
             />
           </Link>
@@ -107,7 +107,7 @@ export default function AuthLayout({
               width={200}
               height={56}
               className="object-contain"
-              style={{ width: 'auto', height: '44px' }}
+              style={{ width: 'auto', height: '50px' }}
               priority
             />
           </Link>
