@@ -2,6 +2,7 @@
 
 import React, { Suspense } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { ArrowRight, Play } from 'lucide-react';
@@ -46,6 +47,21 @@ export function LandingHero() {
       ) : (
         <HeroFallback />
       )}
+
+      {/* Top Center Logo */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex justify-center py-5">
+        <Link href="/">
+          <Image
+            src="/Crypto4pro.png"
+            alt="Crypto4Pro Logo"
+            width={180}
+            height={50}
+            className="object-contain"
+            style={{ width: 'auto', height: 'auto' }}
+            priority
+          />
+        </Link>
+      </div>
 
       {/* Hero Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
