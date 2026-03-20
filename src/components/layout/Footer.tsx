@@ -91,7 +91,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
                 width={150}
                 height={42}
                 className="object-contain"
-                style={{ width: 'auto', height: 'auto' }}
+                style={{ width: 'auto', height: '30px' }}
                 priority
               />
             </div>

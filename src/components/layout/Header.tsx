@@ -65,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               width={140}
               height={40}
               className="object-contain"
-              style={{ width: 'auto', height: 'auto' }}
+              style={{ width: 'auto', height: '32px' }}
               priority
             />
           </Link>
