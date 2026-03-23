@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -58,12 +59,15 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">C</span>
-            </div>
-            <span className="text-xl font-display font-bold text-white hidden sm:block">
-              Crypto4Pro
-            </span>
+            <Image
+              src="/Crypto4pro.png"
+              alt="Crypto4Pro Logo"
+              width={140}
+              height={40}
+              className="object-contain"
+              style={{ width: 'auto', height: '32px' }}
+              priority
+            />
           </Link>
           
           {/* Navigation */}
