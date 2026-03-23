@@ -39,7 +39,7 @@ export default function AuthLayout({
               alt="Crypto4Pro Logo"
               width={180}
               height={50}
-              className="object-contain brightness-0 invert"
+              className="object-contain drop-shadow-lg"
               style={{ width: 'auto', height: '40px' }}
               priority
             />
