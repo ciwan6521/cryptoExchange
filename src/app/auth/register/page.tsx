@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, ArrowRight, Check, X, AlertTriangle } from 'lucide-react';
-import Image from 'next/image';
 import { Button, Input } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -43,17 +42,17 @@ export default function RegisterPage() {
     agreeTerms: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-
+  
   // Focus management refs
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
-
+  
   // Auto-focus on step change
   useEffect(() => {
     if (step === 1) emailRef.current?.focus();
     if (step === 2) passwordRef.current?.focus();
   }, [step]);
-
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -64,18 +63,18 @@ export default function RegisterPage() {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
-
+  
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {};
     const email = formData.email.trim();
     const username = formData.username.trim();
-
+    
     if (!email) {
       newErrors.email = 'Email is required';
     } else if (!EMAIL_REGEX.test(email)) {
       newErrors.email = 'Please enter a valid email address';
     }
-
+    
     if (!username) {
       newErrors.username = 'Username is required';
     } else if (username.length < 3) {
@@ -87,14 +86,14 @@ export default function RegisterPage() {
     } else if (/^_|_$/.test(username)) {
       newErrors.username = 'Username cannot start or end with an underscore';
     }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
+  
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
-
+    
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else {
@@ -103,36 +102,36 @@ export default function RegisterPage() {
         newErrors.password = 'Password does not meet requirements';
       }
     }
-
+    
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-
+    
     if (!formData.agreeTerms) {
       newErrors.agreeTerms = 'You must agree to the terms';
     }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
+  
   const handleContinue = () => {
     if (!registrationEnabled) return;
     if (step === 1 && validateStep1()) {
       setStep(2);
     }
   };
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registrationEnabled) return;
-
+    
     if (!validateStep2()) return;
-
+    
     setIsLoading(true);
-
+    
     try {
       await register({
         email: formData.email.trim(),
@@ -147,24 +146,19 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
-
+  
   return (
     <div>
       {/* Mobile logo */}
       <div className="lg:hidden mb-8 text-center">
         <Link href="/" className="inline-flex items-center gap-2">
-          <Image
-            src="/Crypto4pro.png"
-            alt="Crypto4Pro Logo"
-            width={160}
-            height={45}
-            className="object-contain"
-            style={{ width: 'auto', height: '40px' }}
-            priority
-          />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+            <span className="text-white font-bold text-xl">C</span>
+          </div>
+          <span className="text-2xl font-display font-bold text-white">Crypto4Pro</span>
         </Link>
       </div>
-
+      
       {/* Registration disabled banner */}
       {!registrationEnabled && (
         <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-3">
@@ -191,7 +185,7 @@ export default function RegisterPage() {
           step >= 2 ? 'bg-brand-500' : 'bg-surface-100'
         )} />
       </div>
-
+      
       {/* Header */}
       <div className="mb-8">
         <h2 className="text-2xl font-display font-bold text-white mb-2">
@@ -203,7 +197,7 @@ export default function RegisterPage() {
             : 'Choose a strong password to secure your account'}
         </p>
       </div>
-
+      
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
         {step === 1 ? (
@@ -221,7 +215,7 @@ export default function RegisterPage() {
               autoComplete="email"
               maxLength={254}
             />
-
+            
             <Input
               label="Username"
               name="username"
@@ -234,7 +228,7 @@ export default function RegisterPage() {
               hint="This will be your public display name"
               autoComplete="username"
             />
-
+            
             <Button
               type="button"
               fullWidth
@@ -262,7 +256,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 maxLength={128}
               />
-
+              
               {/* Password strength indicator */}
               {formData.password && (
                 <motion.div
@@ -292,7 +286,7 @@ export default function RegisterPage() {
                 </motion.div>
               )}
             </div>
-
+            
             <Input
               label="Confirm Password"
               name="confirmPassword"
@@ -304,7 +298,7 @@ export default function RegisterPage() {
               leftIcon={<Lock className="w-4 h-4" />}
               autoComplete="new-password"
             />
-
+            
             {/* Terms checkbox */}
             <label className={cn(
               'flex items-start gap-3 cursor-pointer',
@@ -328,7 +322,7 @@ export default function RegisterPage() {
                 </Link>
               </span>
             </label>
-
+            
             <div className="flex gap-3">
               <Button
                 type="button"
@@ -352,7 +346,7 @@ export default function RegisterPage() {
           </>
         )}
       </form>
-
+      
       {/* Login link */}
       <p className="mt-8 text-center text-sm text-gray-400">
         Already have an account?{' '}
@@ -363,7 +357,7 @@ export default function RegisterPage() {
           Sign in
         </Link>
       </p>
-
+      
       {/* Referral notice */}
       {step === 1 && (
         <motion.div

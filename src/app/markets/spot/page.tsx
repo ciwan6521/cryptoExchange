@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowUpRight, ArrowDownRight, Search, Star } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
-import { Card, CardHeader, Skeleton } from '@/components/ui';
+import { Card, CardHeader, Skeleton, CoinIcon } from '@/components/ui';
 import { useTickers } from '@/hooks';
 import { formatPrice, formatPercent, formatNumber, cn } from '@/lib/utils';
 
@@ -81,9 +81,7 @@ export default function SpotMarketsPage() {
                         <tr key={ticker.symbol} className="hover:bg-white/[0.02] transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xs">
-                                {ticker.baseAsset.slice(0, 2)}
-                              </div>
+                              <CoinIcon symbol={ticker.baseAsset} size={32} />
                               <div>
                                 <span className="font-medium text-white">{ticker.baseAsset}</span>
                                 <span className="text-gray-500">/{ticker.quoteAsset}</span>

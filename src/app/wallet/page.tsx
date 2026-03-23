@@ -13,23 +13,10 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
-import { Card, Button, Skeleton } from '@/components/ui';
+import { Card, Button, Skeleton, CoinIcon } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { walletApi, type WalletAsset } from '@/lib/api';
-
-// Coin color mapping for visual distinction
-const COIN_COLORS: Record<string, string> = {
-  BTC: 'from-orange-400 to-orange-600',
-  ETH: 'from-blue-400 to-blue-600',
-  BNB: 'from-yellow-400 to-yellow-600',
-  SOL: 'from-purple-400 to-purple-600',
-  XRP: 'from-gray-300 to-gray-500',
-  ADA: 'from-blue-300 to-blue-500',
-  DOGE: 'from-amber-300 to-amber-500',
-  TRX: 'from-red-400 to-red-600',
-  USDT: 'from-emerald-400 to-emerald-600',
-};
 
 function formatUsd(value: string | null): string {
   if (!value) return '—';
@@ -226,7 +213,6 @@ export default function WalletPage() {
                 <div className="divide-y divide-white/5">
                   {assets.map((asset, idx) => {
                     const hasBalance = parseFloat(asset.total) > 0;
-                    const gradient = COIN_COLORS[asset.symbol] || 'from-gray-400 to-gray-600';
                     return (
                       <motion.div
                         key={asset.symbol}
@@ -240,12 +226,7 @@ export default function WalletPage() {
                       >
                         {/* Asset Info */}
                         <div className="col-span-3 flex items-center gap-3">
-                          <div className={cn(
-                            'w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-bold text-xs flex-shrink-0',
-                            gradient
-                          )}>
-                            {asset.symbol.slice(0, 2)}
-                          </div>
+                          <CoinIcon symbol={asset.symbol} size={40} />
                           <div>
                             <p className="text-sm font-semibold text-white">{asset.symbol}</p>
                             <p className="text-xs text-gray-500">{asset.name}</p>

@@ -17,7 +17,7 @@ import {
   ArrowRightLeft,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
-import { Card, CardHeader, Button, Skeleton, Badge, AnimatedNumber } from '@/components/ui';
+import { Card, CardHeader, Button, Skeleton, Badge, AnimatedNumber, CoinIcon } from '@/components/ui';
 import { ConnectionBanner } from '@/components/trading';
 import { useTickers } from '@/hooks';
 import { formatPrice, formatPercent, formatNumber, cn } from '@/lib/utils';
@@ -228,9 +228,7 @@ export default function DashboardPage() {
                             className="px-4 py-3 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm">
-                                {balance.asset.slice(0, 2)}
-                              </div>
+                              <CoinIcon symbol={balance.asset} size={40} />
                               <div>
                                 <div className="font-medium text-white">{balance.asset}</div>
                                 <div className="text-sm text-gray-500">
@@ -405,9 +403,7 @@ export default function DashboardPage() {
                             className="px-4 py-3 flex items-center justify-between hover:bg-white/[0.02] transition-colors cursor-pointer"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xs">
-                                {ticker.baseAsset.slice(0, 2)}
-                              </div>
+                              <CoinIcon symbol={ticker.baseAsset} size={32} />
                               <div>
                                 <div className="font-medium text-white text-sm">
                                   {ticker.baseAsset}

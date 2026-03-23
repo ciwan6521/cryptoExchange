@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion, type HTMLMotionProps } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { CoinIcon } from './CoinIcon';
 
 // ============================================
 // Card Component
@@ -194,10 +195,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
   return (
     <Card hover onClick={onClick} className="cursor-pointer">
       <div className="flex items-center gap-3">
-        {/* Asset icon placeholder */}
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm">
-          {baseAsset.slice(0, 2)}
-        </div>
+        <CoinIcon symbol={baseAsset} size={40} />
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">

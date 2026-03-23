@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { Orderbook, TradingChart, OrderForm, RecentTrades, TradingErrorBoundary, ConnectionBanner, ConnectionDot } from '@/components/trading';
-import { Card, Badge, Skeleton, AnimatedNumber } from '@/components/ui';
+import { Card, Badge, Skeleton, AnimatedNumber, CoinIcon } from '@/components/ui';
 import { useTicker, useTickers } from '@/hooks';
 import { formatPrice, formatPercent, formatNumber, cn } from '@/lib/utils';
 import { useTradingStore } from '@/stores/trading-store';
@@ -134,9 +134,7 @@ export default function TradingPage() {
                     pair.symbol === symbol && 'bg-white/5'
                   )}
                 >
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-[10px]">
-                    {pair.baseAsset.slice(0, 2)}
-                  </div>
+                  <CoinIcon symbol={pair.baseAsset} size={24} />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-white">
                       {pair.baseAsset}
@@ -166,9 +164,7 @@ export default function TradingPage() {
           <div className="h-14 px-4 flex items-center gap-6 border-b border-glass-border bg-surface-300/50">
             {/* Pair selector */}
             <button className="flex items-center gap-2 hover:bg-white/5 rounded-lg px-2 py-1 transition-colors">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xs">
-                {baseAsset.slice(0, 2)}
-              </div>
+              <CoinIcon symbol={baseAsset} size={32} />
               <div className="text-left">
                 <div className="text-sm font-semibold text-white flex items-center gap-1">
                   {baseAsset}/{quoteAsset}

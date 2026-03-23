@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight, Chrome } from 'lucide-react';
-import Image from 'next/image';
 import { Button, Input } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -23,7 +22,7 @@ export default function LoginPage() {
     password: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
       ...prev,
@@ -34,33 +33,33 @@ export default function LoginPage() {
       setErrors(prev => ({ ...prev, [e.target.name]: '' }));
     }
   };
-
+  
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
+    
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email';
     }
-
+    
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters';
     }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!validateForm()) return;
-
+    
     setIsLoading(true);
-
+    
     try {
       await login({
         email: formData.email,
@@ -73,24 +72,19 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
-
+  
   return (
     <div>
       {/* Mobile logo */}
       <div className="lg:hidden mb-8 text-center">
         <Link href="/" className="inline-flex items-center gap-2">
-          <Image
-            src="/Crypto4pro.png"
-            alt="Crypto4Pro Logo"
-            width={160}
-            height={45}
-            className="object-contain"
-            style={{ width: 'auto', height: '40px' }}
-            priority
-          />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+            <span className="text-white font-bold text-xl">C</span>
+          </div>
+          <span className="text-2xl font-display font-bold text-white">Crypto4Pro</span>
         </Link>
       </div>
-
+      
       {/* Header */}
       <div className="mb-8">
         <h2 className="text-2xl font-display font-bold text-white mb-2">
@@ -100,7 +94,7 @@ export default function LoginPage() {
           Enter your credentials to access your account
         </p>
       </div>
-
+      
       {/* Backend error banner */}
       {errors.form && (
         <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
@@ -121,7 +115,7 @@ export default function LoginPage() {
           leftIcon={<Mail className="w-4 h-4" />}
           autoComplete="email"
         />
-
+        
         <Input
           label="Password"
           name="password"
@@ -133,7 +127,7 @@ export default function LoginPage() {
           leftIcon={<Lock className="w-4 h-4" />}
           autoComplete="current-password"
         />
-
+        
         {/* Remember & Forgot */}
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 cursor-pointer">
@@ -150,7 +144,7 @@ export default function LoginPage() {
             Forgot password?
           </Link>
         </div>
-
+        
         {/* Submit */}
         <Button
           type="submit"
@@ -163,7 +157,7 @@ export default function LoginPage() {
           Sign In
         </Button>
       </form>
-
+      
       {/* Divider */}
       <div className="relative my-8">
         <div className="absolute inset-0 flex items-center">
@@ -175,7 +169,7 @@ export default function LoginPage() {
           </span>
         </div>
       </div>
-
+      
       {/* Social login */}
       <div className="grid grid-cols-2 gap-4">
         <Button variant="secondary" className="gap-2">
@@ -189,7 +183,7 @@ export default function LoginPage() {
           GitHub
         </Button>
       </div>
-
+      
       {/* Register link */}
       <p className="mt-8 text-center text-sm text-gray-400">
         Don&apos;t have an account?{' '}
@@ -200,7 +194,7 @@ export default function LoginPage() {
           Create one now
         </Link>
       </p>
-
+      
       {/* Security notice */}
       <motion.div
         initial={{ opacity: 0 }}

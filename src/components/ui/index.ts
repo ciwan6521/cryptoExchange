@@ -18,4 +18,5 @@ export { Badge } from './Badge';
 export { Modal } from './Modal';
 export { Select } from './Select';
 export { AnimatedNumber } from './AnimatedNumber';
+export { CoinIcon } from './CoinIcon';
 

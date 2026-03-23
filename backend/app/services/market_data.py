@@ -1,6 +1,9 @@
 """
 MarketDataService — fetches real-time crypto prices from Binance public API.
 
+Now dynamically fetches the TOP 100 coins by 24h USDT volume.
+No hardcoded list — fully automatic.
+
 Features:
 - Background polling every 5 seconds (non-blocking)
 - Redis cache with 30s TTL (stale fallback if API fails)
@@ -25,30 +28,26 @@ from app.config import settings
 logger = logging.getLogger("crypto4pro.market_data")
 
 # Binance public endpoints — no API key, generous rate limits
-BINANCE_TICKER_PRICE_URL = "https://api.binance.com/api/v3/ticker/price"
 BINANCE_TICKER_24H_URL = "https://api.binance.com/api/v3/ticker/24hr"
 
-# Maps our asset symbols to Binance trading pair symbols (priced in USDT)
-ASSET_TO_BINANCE: dict[str, str] = {
-    "BTC": "BTCUSDT",
-    "ETH": "ETHUSDT",
-    "BNB": "BNBUSDT",
-    "SOL": "SOLUSDT",
-    "XRP": "XRPUSDT",
-    "ADA": "ADAUSDT",
-    "DOGE": "DOGEUSDT",
-    "TRX": "TRXUSDT",
-    "AVAX": "AVAXUSDT",
-    "LINK": "LINKUSDT",
-    "DOT": "DOTUSDT",
+# Filter: only keep USDT-quoted pairs, exclude leveraged/stablecoin noise
+EXCLUDED_BASES = {
+    "USDC", "BUSD", "TUSD", "FDUSD", "DAI", "USDP", "USDD", "EUR", "GBP",
+    "TRY", "BRL", "ARS", "AEUR", "BIDR", "IDRT", "UAH", "NGN", "PLN",
+    "RON", "ZAR",
 }
+# Exclude leveraged tokens (end with UP/DOWN/BULL/BEAR)
+LEVERAGED_SUFFIXES = ("UP", "DOWN", "BULL", "BEAR")
+
+TOP_N = 100
 
 CACHE_TTL_SECONDS = 30
 CACHE_KEY_PREFIX = "market:price:"
 CACHE_TICKER_PREFIX = "market:ticker24h:"
+CACHE_TOP_LIST_KEY = "market:top100"
 POLL_INTERVAL_SECONDS = 5
 MAX_RETRIES = 3
-RETRY_BASE_DELAY = 1.0  # seconds
+RETRY_BASE_DELAY = 1.0
 
 
 class MarketDataService:
@@ -58,6 +57,8 @@ class MarketDataService:
         self._poll_task: Optional[asyncio.Task] = None
         self._running = False
         self._last_fetch_time: float = 0
+        # Dynamic symbol set — updated each poll cycle
+        self._active_symbols: set[str] = set()
 
     async def _get_redis(self) -> aioredis.Redis:
         if self._redis is None:
@@ -77,15 +78,13 @@ class MarketDataService:
     # ------------------------------------------------------------------
 
     async def start_polling(self):
-        """Start background price polling loop."""
         if self._running:
             return
         self._running = True
         self._poll_task = asyncio.create_task(self._poll_loop())
-        logger.info("MarketDataService: background polling started (every %ds)", POLL_INTERVAL_SECONDS)
+        logger.info("MarketDataService: polling started — top %d by volume, every %ds", TOP_N, POLL_INTERVAL_SECONDS)
 
     async def stop_polling(self):
-        """Stop background polling."""
         self._running = False
         if self._poll_task:
             self._poll_task.cancel()
@@ -97,7 +96,6 @@ class MarketDataService:
         logger.info("MarketDataService: polling stopped")
 
     async def _poll_loop(self):
-        """Continuously fetch prices every POLL_INTERVAL_SECONDS."""
         while self._running:
             try:
                 await self._fetch_and_cache_all()
@@ -110,45 +108,26 @@ class MarketDataService:
     # ------------------------------------------------------------------
 
     async def fetch_prices(self) -> dict[str, Optional[str]]:
-        """
-        Get current USD prices for all supported assets.
-        Returns from cache if fresh; otherwise fetches live.
-        """
+        """Get current USD prices for all top-100 assets."""
         r = await self._get_redis()
 
-        # Try cache first
-        cached = {}
-        all_cached = True
-        all_symbols = list(ASSET_TO_BINANCE.keys()) + ["USDT"]
-        for symbol in all_symbols:
-            val = await r.get(f"{CACHE_KEY_PREFIX}{symbol}")
-            if val is not None:
-                cached[symbol] = val
-            else:
-                all_cached = False
-
-        if all_cached and len(cached) == len(all_symbols):
-            return cached
-
-        # Cache miss — fetch live
-        await self._fetch_and_cache_all()
-
-        # Re-read from cache
+        symbols = await self._get_active_symbols()
         result: dict[str, Optional[str]] = {}
-        for symbol in all_symbols:
+        for symbol in symbols:
             val = await r.get(f"{CACHE_KEY_PREFIX}{symbol}")
-            result[symbol] = val if val is not None else cached.get(symbol)
+            result[symbol] = val
+
+        # Always include USDT
+        result["USDT"] = "1"
         return result
 
     async def fetch_tickers(self) -> dict[str, dict]:
-        """
-        Get 24h ticker data for all supported assets.
-        Returns dict like {"BTC": {"price": "...", "change": "2.34", "high": "...", ...}}.
-        """
+        """Get 24h ticker data for all top-100 assets."""
         r = await self._get_redis()
         result: dict[str, dict] = {}
 
-        for symbol in list(ASSET_TO_BINANCE.keys()) + ["USDT"]:
+        symbols = await self._get_active_symbols()
+        for symbol in symbols:
             raw = await r.get(f"{CACHE_TICKER_PREFIX}{symbol}")
             if raw:
                 try:
@@ -156,10 +135,9 @@ class MarketDataService:
                 except json.JSONDecodeError:
                     pass
 
-        # If empty, trigger a fetch
         if not result:
             await self._fetch_and_cache_all()
-            for symbol in list(ASSET_TO_BINANCE.keys()) + ["USDT"]:
+            for symbol in symbols:
                 raw = await r.get(f"{CACHE_TICKER_PREFIX}{symbol}")
                 if raw:
                     try:
@@ -167,10 +145,11 @@ class MarketDataService:
                     except json.JSONDecodeError:
                         pass
 
+        # Always include USDT
+        result["USDT"] = {"price": "1", "change": "0", "high": "1", "low": "1", "volume": "0", "quoteVolume": "0"}
         return result
 
     async def get_price(self, symbol: str) -> Optional[str]:
-        """Get cached price for a single asset."""
         r = await self._get_redis()
         val = await r.get(f"{CACHE_KEY_PREFIX}{symbol}")
         if val is not None:
@@ -178,33 +157,67 @@ class MarketDataService:
         prices = await self.fetch_prices()
         return prices.get(symbol)
 
+    async def _get_active_symbols(self) -> set[str]:
+        """Return current top-N symbols. Falls back to cached list in Redis."""
+        if self._active_symbols:
+            return self._active_symbols
+
+        r = await self._get_redis()
+        raw = await r.get(CACHE_TOP_LIST_KEY)
+        if raw:
+            self._active_symbols = set(json.loads(raw))
+        return self._active_symbols
+
     # ------------------------------------------------------------------
     # Internal fetch + cache
     # ------------------------------------------------------------------
 
     async def _fetch_and_cache_all(self):
-        """Fetch from Binance with retry and cache results."""
+        """Fetch all 24h tickers from Binance, rank by volume, cache top N."""
         data_24h = await self._fetch_with_retry(BINANCE_TICKER_24H_URL)
         if not data_24h:
             return
 
-        r = await self._get_redis()
-        reverse = {v: k for k, v in ASSET_TO_BINANCE.items()}
+        # Filter to USDT pairs and rank by quote volume
+        usdt_pairs: list[tuple[str, dict]] = []
 
         for item in data_24h:
-            binance_symbol = item.get("symbol")
-            if binance_symbol not in reverse:
+            binance_symbol: str = item.get("symbol", "")
+            if not binance_symbol.endswith("USDT"):
                 continue
-            asset = reverse[binance_symbol]
 
+            base = binance_symbol[:-4]  # Remove "USDT" suffix
+
+            if not base or base in EXCLUDED_BASES:
+                continue
+            if any(base.endswith(s) for s in LEVERAGED_SUFFIXES):
+                continue
+
+            try:
+                quote_vol = float(item.get("quoteVolume", "0"))
+            except (ValueError, TypeError):
+                quote_vol = 0
+
+            usdt_pairs.append((base, {**item, "_quote_vol": quote_vol}))
+
+        # Sort by 24h USDT volume descending, take top N
+        usdt_pairs.sort(key=lambda x: x[1]["_quote_vol"], reverse=True)
+        top_pairs = usdt_pairs[:TOP_N]
+
+        r = await self._get_redis()
+        new_symbols: set[str] = set()
+
+        for base, item in top_pairs:
             price = item.get("lastPrice", "0")
             try:
                 Decimal(price)
             except (InvalidOperation, ValueError):
                 continue
 
+            new_symbols.add(base)
+
             # Cache simple price
-            await r.setex(f"{CACHE_KEY_PREFIX}{asset}", CACHE_TTL_SECONDS, price)
+            await r.setex(f"{CACHE_KEY_PREFIX}{base}", CACHE_TTL_SECONDS, price)
 
             # Cache full 24h ticker
             ticker = {
@@ -215,17 +228,18 @@ class MarketDataService:
                 "volume": item.get("volume", "0"),
                 "quoteVolume": item.get("quoteVolume", "0"),
             }
-            await r.setex(f"{CACHE_TICKER_PREFIX}{asset}", CACHE_TTL_SECONDS, json.dumps(ticker))
+            await r.setex(f"{CACHE_TICKER_PREFIX}{base}", CACHE_TTL_SECONDS, json.dumps(ticker))
 
         # USDT is always $1
         await r.setex(f"{CACHE_KEY_PREFIX}USDT", CACHE_TTL_SECONDS, "1")
-        usdt_ticker = {"price": "1", "change": "0", "high": "1", "low": "1", "volume": "0", "quoteVolume": "0"}
-        await r.setex(f"{CACHE_TICKER_PREFIX}USDT", CACHE_TTL_SECONDS, json.dumps(usdt_ticker))
+
+        # Cache the active symbol list (for other services to discover)
+        self._active_symbols = new_symbols
+        await r.setex(CACHE_TOP_LIST_KEY, CACHE_TTL_SECONDS * 2, json.dumps(sorted(new_symbols)))
 
         self._last_fetch_time = time.time()
 
     async def _fetch_with_retry(self, url: str) -> Optional[list]:
-        """Fetch from Binance with exponential backoff retry."""
         client = await self._get_http()
         last_err = None
 
@@ -258,7 +272,7 @@ class MarketDataService:
             self._redis = None
 
 
-# Singleton instance
+# Singleton
 _market_data_service: Optional[MarketDataService] = None
 
 

@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -41,7 +40,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, user, logout } = useAuthStore();
-
+  
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-glass-border bg-surface-300/80 backdrop-blur-xl">
       <div className="h-full px-4 lg:px-6 flex items-center justify-between">
@@ -56,25 +55,22 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           >
             <Menu className="w-5 h-5" />
           </IconButton>
-
+          
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/Crypto4pro.png"
-              alt="Crypto4Pro Logo"
-              width={140}
-              height={40}
-              className="object-contain"
-              style={{ width: 'auto', height: '32px' }}
-              priority
-            />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">C</span>
+            </div>
+            <span className="text-xl font-display font-bold text-white hidden sm:block">
+              Crypto4Pro
+            </span>
           </Link>
-
+          
           {/* Navigation */}
           <nav className="hidden lg:flex items-center gap-1">
             {navigation.map((item) => {
               const isActive = pathname.startsWith(item.href.split('/').slice(0, 2).join('/'));
-
+              
               return (
                 <Link
                   key={item.name}
@@ -102,14 +98,14 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 </Link>
               );
             })}
-
+            
             {/* Markets dropdown */}
             <div className="relative group">
               <button className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-white/5 flex items-center gap-1 transition-colors">
                 Markets
                 <ChevronDown className="w-3 h-3" />
               </button>
-
+              
               {/* Dropdown menu */}
               <div className="absolute top-full left-0 mt-1 w-48 py-2 bg-surface-200 border border-glass-border rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                 <Link
@@ -129,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             </div>
           </nav>
         </div>
-
+        
         {/* Right section */}
         <div className="flex items-center gap-2">
           {/* Search */}
@@ -145,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </kbd>
             </div>
           </div>
-
+          
           {isAuthenticated ? (
             <>
               {/* Notifications */}
@@ -155,7 +151,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   <span className="absolute -top-1 -right-1 w-2 h-2 bg-brand-500 rounded-full" />
                 </div>
               </IconButton>
-
+              
               {/* User menu */}
               <div className="relative group">
                 <button className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
@@ -164,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   </div>
                   <ChevronDown className="w-3 h-3 text-gray-400" />
                 </button>
-
+                
                 {/* User dropdown */}
                 <div className="absolute top-full right-0 mt-1 w-56 py-2 bg-surface-200 border border-glass-border rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                   <div className="px-4 py-3 border-b border-glass-border">

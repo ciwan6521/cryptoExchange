@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Twitter, Github, MessageCircle, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConnectionDot } from '@/components/trading/ConnectionStatus';
@@ -76,7 +75,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
       </footer>
     );
   }
-
+  
   return (
     <footer className="border-t border-glass-border bg-surface-300/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -85,15 +84,12 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
           {/* Brand column */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-6 lg:mb-0">
             <div className="flex items-center gap-2 mb-4">
-              <Image
-                src="/Crypto4pro.png"
-                alt="Crypto4Pro Logo"
-                width={150}
-                height={42}
-                className="object-contain"
-                style={{ width: 'auto', height: '30px' }}
-                priority
-              />
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">C</span>
+              </div>
+              <span className="text-xl font-display font-bold text-white">
+                Crypto4Pro
+              </span>
             </div>
             <p className="text-sm text-gray-400 mb-6 max-w-xs">
               The next generation cryptocurrency exchange. Trade with confidence.
@@ -119,7 +115,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
               ))}
             </div>
           </div>
-
+          
           {/* Link columns */}
           <div>
             <h3 className="text-sm font-semibold text-white mb-4">Products</h3>
@@ -136,7 +132,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
               ))}
             </ul>
           </div>
-
+          
           <div>
             <h3 className="text-sm font-semibold text-white mb-4">Company</h3>
             <ul className="space-y-3">
@@ -152,7 +148,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
               ))}
             </ul>
           </div>
-
+          
           <div>
             <h3 className="text-sm font-semibold text-white mb-4">Support</h3>
             <ul className="space-y-3">
@@ -168,7 +164,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
               ))}
             </ul>
           </div>
-
+          
           <div>
             <h3 className="text-sm font-semibold text-white mb-4">Legal</h3>
             <ul className="space-y-3">
@@ -185,7 +181,7 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
             </ul>
           </div>
         </div>
-
+        
         {/* Bottom bar */}
         <div className="py-6 border-t border-glass-border flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-500">

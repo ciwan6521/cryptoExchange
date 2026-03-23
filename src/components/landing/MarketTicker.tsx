@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useTickers } from '@/hooks';
 import { formatPrice, formatPercent, cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui';
+import { Skeleton, CoinIcon } from '@/components/ui';
 
 // ============================================
 // Market Ticker
@@ -56,10 +56,7 @@ export const MarketTicker: React.FC = () => {
                 href={`/trade/${ticker.baseAsset}-${ticker.quoteAsset}`}
                 className="flex items-center gap-4 px-4 hover:bg-white/5 rounded-lg transition-colors"
               >
-                {/* Asset icon */}
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {ticker.baseAsset.slice(0, 2)}
-                </div>
+                <CoinIcon symbol={ticker.baseAsset} size={40} />
                 
                 {/* Info */}
                 <div className="flex-shrink-0">
