@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight, Chrome } from 'lucide-react';
@@ -77,11 +78,16 @@ export default function LoginPage() {
     <div>
       {/* Mobile logo */}
       <div className="lg:hidden mb-8 text-center">
-        <Link href="/" className="inline-flex items-center gap-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-            <span className="text-white font-bold text-xl">C</span>
-          </div>
-          <span className="text-2xl font-display font-bold text-white">Crypto4Pro</span>
+        <Link href="/" className="inline-flex items-center">
+          <Image
+            src="/Crypto4pro.png"
+            alt="Crypto4Pro Logo"
+            width={160}
+            height={45}
+            className="object-contain"
+            style={{ width: 'auto', height: '36px' }}
+            priority
+          />
         </Link>
       </div>
       

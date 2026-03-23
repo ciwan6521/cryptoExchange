@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 
 // ============================================
@@ -32,11 +33,16 @@ export default function AuthLayout({
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-white">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <span className="text-white font-bold text-xl">C</span>
-            </div>
-            <span className="text-2xl font-display font-bold">Crypto4Pro</span>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/Crypto4pro.png"
+              alt="Crypto4Pro Logo"
+              width={180}
+              height={50}
+              className="object-contain brightness-0 invert"
+              style={{ width: 'auto', height: '40px' }}
+              priority
+            />
           </Link>
           
           {/* Main content */}
