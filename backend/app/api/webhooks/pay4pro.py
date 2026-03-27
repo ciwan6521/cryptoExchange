@@ -139,11 +139,21 @@ async def _handle_deposit_confirmed(
         raise HTTPException(status_code=400, detail="Invalid user_id format")
 
     # Idempotency: check if deposit with this transaction_id already processed
+    # First check pay4pro_deposit_id (set by claim endpoint)
+    existing = None
+    if transaction_id:
+        result = await db.execute(
+            select(Deposit).where(Deposit.pay4pro_deposit_id == transaction_id)
+        )
+        existing = result.scalar_one_or_none()
+
+    # Fallback: check legacy idempotency key pattern
     idempotency_key = f"p4p_deposit:{transaction_id}"
-    existing_result = await db.execute(
-        select(Deposit).where(Deposit.idempotency_key == idempotency_key)
-    )
-    existing = existing_result.scalar_one_or_none()
+    if not existing:
+        result = await db.execute(
+            select(Deposit).where(Deposit.idempotency_key == idempotency_key)
+        )
+        existing = result.scalar_one_or_none()
 
     if existing and existing.status == "completed":
         logger.info("Deposit %s already completed — idempotent skip", transaction_id)
@@ -156,22 +166,27 @@ async def _handle_deposit_confirmed(
     wallet = wallet_result.scalar_one_or_none()
 
     # Create or update deposit record
+    source = payload.get("source", "")
+    network = "BSC" if source == "blockchain" else (payload.get("method", "") or "manual")
+
     if existing:
         deposit = existing
         deposit.status = "completed"
+        deposit.amount = amount
         deposit.tx_hash = tx_hash or deposit.tx_hash
         deposit.from_address = from_address or deposit.from_address
+        deposit.pay4pro_deposit_id = deposit.pay4pro_deposit_id or transaction_id
         deposit.completed_at = datetime.now(timezone.utc)
     else:
         deposit = Deposit(
             user_id=user_id,
             asset=currency,
-            network="BSC",
+            network=network,
             amount=amount,
             tx_hash=tx_hash,
             from_address=from_address,
-            confirmations=15,
-            required_confirmations=15,
+            confirmations=15 if source == "blockchain" else 0,
+            required_confirmations=15 if source == "blockchain" else 0,
             status="completed",
             pay4pro_deposit_id=transaction_id,
             idempotency_key=idempotency_key,
@@ -193,7 +208,7 @@ async def _handle_deposit_confirmed(
             idempotency_key=ledger_key,
             reference_type="deposit",
             reference_id=deposit.id,
-            description=f"Deposit {amount} {currency} via BSC tx:{tx_hash[:16]}..." if tx_hash else f"Deposit {amount} {currency}",
+            description=f"Deposit {amount} {currency} tx:{tx_hash[:16]}..." if tx_hash else f"Deposit {amount} {currency}",
         )
 
     if entry:
@@ -242,11 +257,19 @@ async def _handle_deposit_rejected(
 
     logger.warning("Deposit rejected: tx=%s user=%s", transaction_id, user_id_str)
 
-    idempotency_key = f"p4p_deposit:{transaction_id}"
-    result = await db.execute(
-        select(Deposit).where(Deposit.idempotency_key == idempotency_key)
-    )
-    deposit = result.scalar_one_or_none()
+    deposit = None
+    if transaction_id:
+        result = await db.execute(
+            select(Deposit).where(Deposit.pay4pro_deposit_id == transaction_id)
+        )
+        deposit = result.scalar_one_or_none()
+
+    if not deposit:
+        idempotency_key = f"p4p_deposit:{transaction_id}"
+        result = await db.execute(
+            select(Deposit).where(Deposit.idempotency_key == idempotency_key)
+        )
+        deposit = result.scalar_one_or_none()
     if deposit and deposit.status != "completed":
         deposit.status = "failed"
 
