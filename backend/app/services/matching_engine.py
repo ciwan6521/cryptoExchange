@@ -139,15 +139,17 @@ class MatchingEngine:
             if order_type == "limit":
                 amount = price * quantity
             else:
-                # Market buy: we don't know the price yet.
-                # Lock a large placeholder — excess unlocked after fills.
-                # For safety, we require the user to specify a max quote amount
-                # via the quantity field interpreted as quote amount for market buys.
-                # ALTERNATIVE: reject market buys without price ceiling.
-                raise OrderError(
-                    "Market buy orders are not yet supported. Use limit orders.",
-                    "market_buy_unsupported",
-                )
+                # Market buy: estimate max cost from best ask + buffer.
+                # Lock quote based on estimated market price * quantity * 1.02 buffer.
+                from app.services.market_data import get_market_data_service
+                market_svc = get_market_data_service()
+                prices = await market_svc.fetch_prices()
+                base_sym = pair.base_asset
+                price_str = prices.get(base_sym)
+                if not price_str:
+                    raise OrderError("No market price available for this pair", "no_market_price")
+                estimated_price = Decimal(price_str)
+                amount = estimated_price * quantity * Decimal("1.05")  # 5% slippage buffer
         else:
             asset = pair.base_asset
             amount = quantity

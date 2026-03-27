@@ -81,7 +81,7 @@ export default function LedgerPage() {
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="pt-16 pb-8 px-4 lg:px-8">
+      <main id="main-content" className="pt-16 pb-8 px-4 lg:px-8">
         <div className="max-w-5xl mx-auto">
           {/* Page header */}
           <div className="py-6">

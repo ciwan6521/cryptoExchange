@@ -55,6 +55,7 @@ def _serialize_withdrawal(w: Withdrawal) -> dict:
         "reviewed_at": w.reviewed_at.isoformat() if w.reviewed_at else None,
         "rejection_reason": w.rejection_reason,
         "tx_hash": w.tx_hash,
+        "pay4pro_withdrawal_id": w.pay4pro_withdrawal_id,
         "request_ip": w.request_ip,
         "created_at": w.created_at.isoformat() if w.created_at else None,
         "completed_at": w.completed_at.isoformat() if w.completed_at else None,
@@ -199,17 +200,45 @@ async def approve_withdrawal(
         )
         db.add(log)
         await db.commit()
+
+        # If fully approved, send to Pay4Pro for blockchain settlement
+        p4p_sent = False
+        if withdrawal.status == "approved":
+            try:
+                from app.services.pay4pro_client import get_pay4pro_client
+                p4p = get_pay4pro_client()
+                if p4p.base_url:
+                    p4p_result = await p4p.request_withdrawal(
+                        user_id=str(withdrawal.user_id),
+                        amount=withdrawal.amount,
+                        wallet_address=withdrawal.to_address,
+                        currency=withdrawal.asset,
+                        network=withdrawal.network or "BSC",
+                        metadata={"crypto4pro_withdrawal_id": str(withdrawal.id)},
+                    )
+                    withdrawal.pay4pro_withdrawal_id = p4p_result.withdraw_id or p4p_result.transaction_id
+                    withdrawal.status = "processing"
+                    await db.commit()
+                    p4p_sent = True
+            except Exception as e:
+                import logging
+                logging.getLogger("crypto4pro.admin").error(
+                    "Pay4Pro withdrawal send failed for %s: %s", withdrawal_id, e
+                )
+
     except WithdrawalError as e:
         raise HTTPException(status_code=400, detail=e.message)
+
+    msg = "Withdrawal approved and sent to Pay4Pro for settlement." if p4p_sent else (
+        "Withdrawal approved and ready for settlement."
+        if withdrawal.status == "approved"
+        else f"Approval recorded ({withdrawal.approvals_received}/{withdrawal.approvals_required}). Awaiting more approvals."
+    )
 
     return {
         "ok": True,
         "withdrawal": _serialize_withdrawal(withdrawal),
-        "message": (
-            "Withdrawal approved and ready for settlement."
-            if withdrawal.status == "approved"
-            else f"Approval recorded ({withdrawal.approvals_received}/{withdrawal.approvals_required}). Awaiting more approvals."
-        ),
+        "message": msg,
     }
 
 

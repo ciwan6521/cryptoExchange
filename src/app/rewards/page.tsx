@@ -219,7 +219,7 @@ export default function RewardsPage() {
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="pt-16 pb-8 px-4 lg:px-8">
+      <main id="main-content" className="pt-16 pb-8 px-4 lg:px-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="py-6">

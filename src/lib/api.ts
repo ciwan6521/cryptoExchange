@@ -101,6 +101,14 @@ export interface UserResponse {
   created_at: string;
 }
 
+export interface SessionItem {
+  id: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+  is_current: boolean;
+}
+
 export const authApi = {
   register: (data: { email: string; username: string; password: string }) =>
     request<UserResponse>('/api/auth/register', {
@@ -108,7 +116,7 @@ export const authApi = {
       body: JSON.stringify(data),
     }),
 
-  login: (data: { email: string; password: string }) =>
+  login: (data: { email: string; password: string; totp_code?: string }) =>
     request<UserResponse>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -121,6 +129,51 @@ export const authApi = {
 
   refresh: () =>
     request<UserResponse>('/api/auth/refresh', { method: 'POST' }),
+
+  forgotPassword: (email: string) =>
+    request<{ ok: boolean; message: string }>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    request<{ ok: boolean; message: string }>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    }),
+
+  changePassword: (current_password: string, new_password: string) =>
+    request<{ ok: boolean; message: string }>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password, new_password }),
+    }),
+
+  updateProfile: (data: { username?: string }) =>
+    request<UserResponse>('/api/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  getSessions: () =>
+    request<{ sessions: SessionItem[] }>('/api/auth/sessions'),
+
+  revokeSession: (sessionId: string) =>
+    request<{ ok: boolean }>(`/api/auth/sessions/${sessionId}`, { method: 'DELETE' }),
+
+  sendVerification: () =>
+    request<{ ok: boolean; message: string }>('/api/auth/send-verification', { method: 'POST' }),
+
+  verifyEmail: (token: string) =>
+    request<{ ok: boolean; message: string }>(`/api/auth/verify-email?token=${token}`, { method: 'POST' }),
+
+  setup2FA: () =>
+    request<{ secret: string; provisioning_uri: string }>('/api/auth/2fa/setup', { method: 'POST' }),
+
+  enable2FA: (code: string) =>
+    request<{ ok: boolean; message: string }>(`/api/auth/2fa/enable?code=${code}`, { method: 'POST' }),
+
+  disable2FA: (code: string, password: string) =>
+    request<{ ok: boolean; message: string }>(`/api/auth/2fa/disable?code=${code}&password=${encodeURIComponent(password)}`, { method: 'POST' }),
 };
 
 // ============================================
@@ -461,6 +514,54 @@ export const withdrawalApi = {
 };
 
 // ============================================
+// Deposit API
+// ============================================
+
+export interface DepositItem {
+  id: string;
+  asset: string;
+  network: string;
+  amount: string;
+  tx_hash: string | null;
+  from_address: string | null;
+  confirmations: number;
+  required_confirmations: number;
+  status: string;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface DepositNetwork {
+  asset: string;
+  network: string;
+  name: string;
+  min_deposit: string;
+  confirmations_required: number;
+  estimated_time: string;
+}
+
+export const depositApi = {
+  getAddress: (asset = 'USDT', network = 'BSC') =>
+    request<{ address: string; asset: string; network: string }>(
+      `/api/deposits/address`,
+    ),
+
+  getHistory: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set('status', params.status);
+    if (params?.limit) sp.set('limit', String(params.limit));
+    if (params?.offset) sp.set('offset', String(params.offset));
+    const qs = sp.toString();
+    return request<{ deposits: DepositItem[]; total: number }>(
+      `/api/deposits/my${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  getNetworks: () =>
+    request<{ networks: DepositNetwork[] }>('/api/deposits/networks'),
+};
+
+// ============================================
 // CMS API
 // ============================================
 
@@ -512,6 +613,13 @@ export interface TickerData {
 export interface TickersResponse {
   tickers: Record<string, TickerData>;
 }
+
+export const marketDataApi = {
+  getKlines: (symbol: string, interval: string, limit = 300) =>
+    request<{ symbol: string; interval: string; candles: Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }> }>(
+      `/api/market/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`,
+    ),
+};
 
 export const walletApi = {
   getWallet: () =>

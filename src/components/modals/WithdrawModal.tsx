@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { X, Send, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useBalanceStore } from '@/stores/balance-store';
@@ -55,7 +56,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/withdrawals', {
+      const res = await fetch('/api/withdrawals/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -72,6 +73,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
       }
       setSuccess(true);
       fetchBalances();
+      toast.success('Withdrawal submitted', { description: `${amount} ${asset} withdrawal is pending approval.` });
     } catch (e: any) {
       setError(e.message || 'Withdrawal failed');
     }

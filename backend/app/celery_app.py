@@ -1,9 +1,5 @@
 """
-Celery application configuration with beat schedule.
-
-Tasks:
-- Daily ledger reconciliation
-- Periodic health check logging
+Celery application — single unified configuration.
 
 Usage:
   celery -A app.celery_app worker --loglevel=info
@@ -29,16 +25,27 @@ celery.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    task_default_retry_delay=5,
+    task_max_retries=3,
 )
 
-# Beat schedule — recurring tasks
+celery.autodiscover_tasks(["app.tasks"])
+
 celery.conf.beat_schedule = {
     "daily-ledger-reconciliation": {
         "task": "app.tasks.celery_tasks.run_daily_reconciliation",
-        "schedule": crontab(hour=3, minute=0),  # 3:00 AM UTC daily
+        "schedule": crontab(hour=3, minute=0),
     },
     "hourly-health-log": {
         "task": "app.tasks.celery_tasks.log_system_health",
-        "schedule": crontab(minute=0),  # Every hour on the hour
+        "schedule": crontab(minute=0),
+    },
+    "pay4pro-reconciliation": {
+        "task": "app.tasks.pay4pro_tasks.reconcile_pay4pro_balances",
+        "schedule": crontab(hour="*/6", minute=15),
+    },
+    "pay4pro-poll-withdrawals": {
+        "task": "app.tasks.pay4pro_tasks.poll_pending_withdrawals",
+        "schedule": 300,
     },
 }

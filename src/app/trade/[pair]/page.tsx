@@ -22,6 +22,7 @@ import { formatPrice, formatPercent, formatNumber, cn } from '@/lib/utils';
 import { useTradingStore } from '@/stores/trading-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useOrderStore } from '@/stores/order-store';
+import { useBalanceStore } from '@/stores/balance-store';
 import { marketApi, type TradingPairConfig } from '@/lib/api';
 
 // ============================================
@@ -38,6 +39,7 @@ export default function TradingPage() {
   const isMobileRestricted = useTradingStore((s) => s.isMobileTradeRestricted);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { openOrders, openOrdersLoading, orderHistory, orderHistoryLoading, userTrades, userTradesLoading, fetchOpenOrders, fetchOrderHistory, fetchUserTrades } = useOrderStore();
+  const { balances, fetchBalances } = useBalanceStore();
   const [activeTab, setActiveTab] = useState<'open' | 'history' | 'trades'>('open');
   const [pairConfig, setPairConfig] = useState<TradingPairConfig | null>(null);
   
@@ -61,12 +63,13 @@ export default function TradingPage() {
     }).catch(() => {});
   }, [dashSymbol]);
   
-  // Fetch user orders/trades when authenticated
+  // Fetch user orders/trades and balances when authenticated
   useEffect(() => {
     if (isAuthenticated) {
       fetchOpenOrders(dashSymbol);
+      fetchBalances();
     }
-  }, [isAuthenticated, dashSymbol, fetchOpenOrders]);
+  }, [isAuthenticated, dashSymbol, fetchOpenOrders, fetchBalances]);
 
   const handleTabChange = useCallback((tab: 'open' | 'history' | 'trades') => {
     setActiveTab(tab);
@@ -77,7 +80,17 @@ export default function TradingPage() {
   
   // Fallback base price from ticker or pair config
   const basePrice = ticker?.price || (pairConfig ? parseFloat(pairConfig.tick_size) * 100000 : 97842.5);
-  
+
+  // Real balances for the active trading pair
+  const userBaseBalance = useMemo(() => {
+    const b = balances.find(x => x.asset === baseAsset);
+    return b ? parseFloat(b.available || '0') : 0;
+  }, [balances, baseAsset]);
+  const userQuoteBalance = useMemo(() => {
+    const b = balances.find(x => x.asset === quoteAsset);
+    return b ? parseFloat(b.available || '0') : 0;
+  }, [balances, quoteAsset]);
+
   // Loading state
   const isLoading = !ticker;
   
@@ -99,7 +112,7 @@ export default function TradingPage() {
       )}
       
       {/* Trading interface */}
-      <main className="flex-1 flex flex-col lg:flex-row">
+      <main id="main-content" className="flex-1 flex flex-col lg:flex-row">
         {/* Left sidebar - Market list */}
         <aside className="hidden xl:block w-64 border-r border-glass-border bg-surface-300/30">
           <div className="p-3 border-b border-glass-border">
@@ -261,6 +274,8 @@ export default function TradingPage() {
                   baseAsset={baseAsset}
                   quoteAsset={quoteAsset}
                   currentPrice={ticker?.price || basePrice}
+                  availableBase={userBaseBalance}
+                  availableQuote={userQuoteBalance}
                 />
               </TradingErrorBoundary>
             </div>

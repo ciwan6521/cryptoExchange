@@ -17,9 +17,12 @@ export interface AuthUser {
   memberTier: string;
   isActive: boolean;
   isVerified: boolean;
+  email_verified: boolean;
   kycStatus: string;
   tradingEnabled: boolean;
   withdrawalsEnabled: boolean;
+  totp_enabled: boolean;
+  created_at: string;
 }
 
 interface AuthState {
@@ -30,7 +33,7 @@ interface AuthState {
 
   // Actions — all go through backend
   register: (data: { email: string; username: string; password: string }) => Promise<void>;
-  login: (data: { email: string; password: string }) => Promise<void>;
+  login: (data: { email: string; password: string; totp_code?: string }) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
 
@@ -48,9 +51,12 @@ function mapUser(u: UserResponse): AuthUser {
     memberTier: u.member_tier || 'standard',
     isActive: u.is_active,
     isVerified: u.is_verified,
+    email_verified: u.email_verified,
     kycStatus: u.kyc_status,
     tradingEnabled: u.trading_enabled,
     withdrawalsEnabled: u.withdrawals_enabled,
+    totp_enabled: u.totp_enabled,
+    created_at: u.created_at,
   };
 }
 

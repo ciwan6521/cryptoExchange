@@ -73,7 +73,7 @@ export default function DashboardPage() {
         <ConnectionBanner />
       </div>
       
-      <main className="pb-8 px-4 lg:px-8">
+      <main id="main-content" className="pb-8 px-4 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {/* Page header */}
           <div className="py-6">

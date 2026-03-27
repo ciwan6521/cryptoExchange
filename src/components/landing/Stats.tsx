@@ -12,23 +12,22 @@ import { formatNumber } from '@/lib/utils';
 
 const stats = [
   {
-    value: 5.2,
-    suffix: 'M+',
-    label: 'Active Traders',
-    description: 'Trust Crypto4Pro for their trading needs',
-  },
-  {
-    value: 128,
-    suffix: 'B+',
-    label: '24h Volume',
-    prefix: '$',
-    description: 'Daily trading volume across all markets',
-  },
-  {
-    value: 200,
+    value: 100,
     suffix: '+',
-    label: 'Cryptocurrencies',
-    description: 'Available for spot and futures trading',
+    label: 'Trading Pairs',
+    description: 'Top cryptocurrencies available for trading',
+  },
+  {
+    value: 0.1,
+    suffix: '%',
+    label: 'Trading Fees',
+    description: 'Industry-low fees for makers and takers',
+  },
+  {
+    value: 24,
+    suffix: '/7',
+    label: 'Live Markets',
+    description: 'Non-stop trading around the clock',
   },
   {
     value: 99.99,
@@ -134,7 +133,6 @@ export const Stats: React.FC = () => {
             <AnimatedStat
               key={stat.label}
               value={stat.value}
-              prefix={stat.prefix}
               suffix={stat.suffix}
               label={stat.label}
               description={stat.description}
@@ -143,7 +141,7 @@ export const Stats: React.FC = () => {
           ))}
         </div>
         
-        {/* Trust badges */}
+        {/* Trust indicators */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -151,11 +149,8 @@ export const Stats: React.FC = () => {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="mt-16 pt-16 border-t border-glass-border"
         >
-          <p className="text-center text-sm text-gray-500 mb-6">
-            Backed by industry leaders and regulated worldwide
-          </p>
           <div className="flex flex-wrap items-center justify-center gap-8 opacity-50">
-            {['SEC Registered', 'SOC 2 Type II', 'ISO 27001', 'GDPR Compliant'].map(
+            {['SSL Encrypted', 'Cold Storage', '2FA Secured', 'Real-time Monitoring'].map(
               (badge) => (
                 <div
                   key={badge}

@@ -19,6 +19,7 @@ class Wallet(Base):
     asset: Mapped[str] = mapped_column(String(10), nullable=False)
     network: Mapped[str] = mapped_column(String(20), nullable=False)  # TRC20, ERC20, etc.
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)  # NULL until generated
+    external_wallet_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -42,6 +43,9 @@ class Deposit(Base):
 
     status: Mapped[str] = mapped_column(String(15), nullable=False, default="pending", index=True)
     # Status: pending, confirming, completed, failed
+
+    # Pay4Pro reference
+    pay4pro_deposit_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
 
     # Ledger reference
     ledger_tx_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
@@ -119,6 +123,9 @@ class Withdrawal(Base):
     # Keep legacy column name for backwards compat
     ledger_tx_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+
+    # Pay4Pro reference
+    pay4pro_withdrawal_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
 
     # IP for fraud detection
     request_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)

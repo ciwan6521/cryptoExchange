@@ -29,28 +29,86 @@ class UpdatePairRequest(BaseModel):
     step_size: Optional[str] = None
 
 
+def _pair_row(p: TradingPair) -> dict:
+    return {
+        "id": str(p.id),
+        "symbol": p.symbol,
+        "base_asset": p.base_asset,
+        "quote_asset": p.quote_asset,
+        "price_precision": p.price_precision,
+        "quantity_precision": p.quantity_precision,
+        "tick_size": str(p.tick_size),
+        "step_size": str(p.step_size),
+        "min_order_size": str(p.min_order_size),
+        "max_order_size": str(p.max_order_size),
+        "min_notional": str(p.min_notional),
+        "maker_fee": str(p.maker_fee),
+        "taker_fee": str(p.taker_fee),
+        "is_enabled": p.is_enabled,
+    }
+
+
 @router.get("")
+@router.get("/pairs")
 async def list_pairs(
     admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(TradingPair).order_by(TradingPair.symbol))
     pairs = list(result.scalars().all())
-    return {
-        "pairs": [
-            {
-                "id": str(p.id), "symbol": p.symbol,
-                "base_asset": p.base_asset, "quote_asset": p.quote_asset,
-                "price_precision": p.price_precision, "quantity_precision": p.quantity_precision,
-                "tick_size": str(p.tick_size), "step_size": str(p.step_size),
-                "min_order_size": str(p.min_order_size), "max_order_size": str(p.max_order_size),
-                "min_notional": str(p.min_notional),
-                "maker_fee": str(p.maker_fee), "taker_fee": str(p.taker_fee),
-                "is_enabled": p.is_enabled,
-            }
-            for p in pairs
-        ]
-    }
+    return {"pairs": [_pair_row(p) for p in pairs]}
+
+
+async def _apply_pair_update(
+    pair: TradingPair,
+    body: UpdatePairRequest,
+    admin: AdminUser,
+    request: Request,
+    db: AsyncSession,
+) -> dict:
+    changes = {}
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is not None:
+            if field in (
+                "min_order_size",
+                "max_order_size",
+                "min_notional",
+                "maker_fee",
+                "taker_fee",
+                "tick_size",
+                "step_size",
+            ):
+                value = Decimal(value)
+            setattr(pair, field, value)
+            changes[field] = str(value)
+
+    log = AuditLog(
+        admin_id=admin.id,
+        action="update_trading_pair",
+        target_type="trading_pair",
+        target_id=pair.id,
+        details={"symbol": pair.symbol, **changes},
+        ip_address=request.client.host if request.client else None,
+    )
+    db.add(log)
+    await db.commit()
+    return {"ok": True, "symbol": pair.symbol, "changes": changes}
+
+
+@router.patch("/pairs/{symbol}")
+async def update_pair_by_symbol(
+    symbol: str,
+    body: UpdatePairRequest,
+    request: Request,
+    admin: AdminUser = Depends(require_admin_role("super_admin", "operator")),
+    db: AsyncSession = Depends(get_db),
+):
+    normalized = symbol.strip().upper()
+    result = await db.execute(select(TradingPair).where(TradingPair.symbol == normalized))
+    pair = result.scalar_one_or_none()
+    if not pair:
+        raise HTTPException(status_code=404, detail="Trading pair not found")
+    return await _apply_pair_update(pair, body, admin, request, db)
 
 
 @router.patch("/{pair_id}")
@@ -65,22 +123,4 @@ async def update_pair(
     pair = result.scalar_one_or_none()
     if not pair:
         raise HTTPException(status_code=404, detail="Trading pair not found")
-
-    changes = {}
-    for field, value in body.model_dump(exclude_unset=True).items():
-        if value is not None:
-            if field in ("min_order_size", "max_order_size", "min_notional", "maker_fee", "taker_fee", "tick_size", "step_size"):
-                value = Decimal(value)
-            setattr(pair, field, value)
-            changes[field] = str(value)
-
-    log = AuditLog(
-        admin_id=admin.id, action="update_trading_pair",
-        target_type="trading_pair", target_id=pair.id,
-        details={"symbol": pair.symbol, **changes},
-        ip_address=request.client.host if request.client else None,
-    )
-    db.add(log)
-    await db.commit()
-
-    return {"ok": True, "symbol": pair.symbol, "changes": changes}
+    return await _apply_pair_update(pair, body, admin, request, db)

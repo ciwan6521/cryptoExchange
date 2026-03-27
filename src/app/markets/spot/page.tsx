@@ -26,7 +26,7 @@ export default function SpotMarketsPage() {
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="pt-16 pb-8 px-4 lg:px-8">
+      <main id="main-content" className="pt-16 pb-8 px-4 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="py-6">
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>

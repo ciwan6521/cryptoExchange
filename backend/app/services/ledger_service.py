@@ -355,21 +355,26 @@ class LedgerService:
         category: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[LedgerEntry]:
-        """Get ledger history for a user with optional filters."""
-        # Server-side cap — never return more than 200 rows regardless of input
+    ) -> tuple[list[LedgerEntry], int]:
+        """Get ledger history for a user with optional filters. Returns (entries, total_count)."""
+        from sqlalchemy import func as sa_func
         limit = min(limit, 200)
+
+        conditions = [LedgerEntry.user_id == user_id]
+        if asset:
+            conditions.append(LedgerEntry.asset == asset)
+        if category:
+            conditions.append(LedgerEntry.category == category)
+
+        count_q = select(sa_func.count(LedgerEntry.id)).where(*conditions)
+        total = (await self.db.execute(count_q)).scalar() or 0
+
         query = (
             select(LedgerEntry)
-            .where(LedgerEntry.user_id == user_id)
+            .where(*conditions)
             .order_by(LedgerEntry.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
-        if asset:
-            query = query.where(LedgerEntry.asset == asset)
-        if category:
-            query = query.where(LedgerEntry.category == category)
-
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total

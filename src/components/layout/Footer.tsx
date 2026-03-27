@@ -32,10 +32,9 @@ const footerLinks = {
     { name: 'Bug Bounty', href: '/security' },
   ],
   legal: [
-    { name: 'Terms of Service', href: '/terms' },
-    { name: 'Privacy Policy', href: '/privacy' },
-    { name: 'Cookies', href: '/cookies' },
-    { name: 'Licenses', href: '/licenses' },
+    { name: 'Terms of Service', href: '/legal/terms' },
+    { name: 'Privacy Policy', href: '/legal/privacy' },
+    { name: 'Fee Schedule', href: '/fees' },
   ],
 };
 

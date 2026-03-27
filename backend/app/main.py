@@ -10,6 +10,7 @@ Production-grade crypto exchange backend with:
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -17,6 +18,17 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+
+# Sentry initialization (no-op if DSN not set)
+_sentry_dsn = os.environ.get("SENTRY_DSN", "")
+if _sentry_dsn:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.1,
+        environment=settings.APP_ENV,
+        send_default_pii=False,
+    )
 from app.database import engine, Base
 from app.events.bus import EventBus
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -43,12 +55,20 @@ from app.api.admin.withdrawals import router as admin_withdrawals_router
 from app.api.admin.reconciliation import router as admin_reconciliation_router
 from app.api.admin.wallet import router as admin_wallet_router
 from app.api.admin.deposit_methods import router as admin_deposit_methods_router
+from app.api.admin.orders import router as admin_orders_router
+from app.api.admin.wallets_admin import router as admin_wallets_ops_router
 
 # User withdrawal + orders routers
 from app.api.withdrawals import router as withdrawal_router
 from app.api.orders import router as orders_router
 from app.api.ws import router as ws_router
 from app.api.wallet import router as wallet_router
+
+# Webhooks
+from app.api.webhooks.pay4pro import router as pay4pro_webhook_router
+
+# User deposits
+from app.api.deposits import router as deposits_router
 from app.services.market_data import get_market_data_service
 
 
@@ -128,6 +148,8 @@ app.include_router(withdrawal_router)
 app.include_router(orders_router)
 app.include_router(ws_router)
 app.include_router(wallet_router)
+app.include_router(pay4pro_webhook_router)
+app.include_router(deposits_router)
 
 # Register routers — Admin
 app.include_router(admin_auth_router)
@@ -141,6 +163,8 @@ app.include_router(admin_withdrawals_router)
 app.include_router(admin_reconciliation_router)
 app.include_router(admin_wallet_router)
 app.include_router(admin_deposit_methods_router)
+app.include_router(admin_orders_router)
+app.include_router(admin_wallets_ops_router)
 
 
 @app.get("/api/health")

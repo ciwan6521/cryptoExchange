@@ -64,7 +64,7 @@ async def get_ledger_history(
     ledger: LedgerService = Depends(get_ledger_service),
 ):
     """Get ledger history for the current user."""
-    entries = await ledger.get_history(
+    entries, total = await ledger.get_history(
         user_id=user.id,
         asset=asset.upper() if asset else None,
         category=category,
@@ -88,5 +88,5 @@ async def get_ledger_history(
             )
             for e in entries
         ],
-        total=len(entries),
+        total=total,
     )

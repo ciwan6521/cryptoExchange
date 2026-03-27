@@ -70,6 +70,10 @@ services:
       - RATE_LIMIT_PER_MINUTE=60
       - ENABLE_BLOCKCHAIN_WALLET=false
       - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD:-}
+      # Pay4Pro Integration
+      - PAY4PRO_BASE_URL=${PAY4PRO_BASE_URL:-}
+      - PAY4PRO_API_KEY=${PAY4PRO_API_KEY:-}
+      - PAY4PRO_WEBHOOK_SECRET=${PAY4PRO_WEBHOOK_SECRET:-}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
@@ -105,7 +109,10 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
-    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+      - PAY4PRO_BASE_URL=${PAY4PRO_BASE_URL:-}
+      - PAY4PRO_API_KEY=${PAY4PRO_API_KEY:-}
+      - PAY4PRO_WEBHOOK_SECRET=${PAY4PRO_WEBHOOK_SECRET:-}
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     networks:
       - c4p-internal
     logging:
@@ -134,7 +141,10 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
-    command: celery -A app.tasks.celery_app beat --loglevel=info
+      - PAY4PRO_BASE_URL=${PAY4PRO_BASE_URL:-}
+      - PAY4PRO_API_KEY=${PAY4PRO_API_KEY:-}
+      - PAY4PRO_WEBHOOK_SECRET=${PAY4PRO_WEBHOOK_SECRET:-}
+    command: celery -A app.celery_app beat --loglevel=info
     networks:
       - c4p-internal
     logging:

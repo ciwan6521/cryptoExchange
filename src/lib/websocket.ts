@@ -251,15 +251,17 @@ class ExchangeWebSocket {
   }
 
   /**
-   * Generate orderbook from real price data.
-   * Uses real last price as midpoint.
+   * Fetch real orderbook from backend API, then poll for updates.
+   * Falls back to price-derived synthetic orderbook if backend returns empty data.
    */
   private _startOrderbookUpdates(symbol: string): void {
     const channel = `orderbook:${symbol}`;
     const pair = this.tradingPairs.get(symbol);
     if (!pair) return;
 
-    const generateOB = (basePrice: number): Orderbook => {
+    const dashSymbol = symbol.replace('/', '-');
+
+    const generateSyntheticOB = (basePrice: number): Orderbook => {
       const asks: { price: number; quantity: number; total: number; percentage: number }[] = [];
       const bids: { price: number; quantity: number; total: number; percentage: number }[] = [];
       const tickSize = basePrice > 10000 ? 0.01 : basePrice > 100 ? 0.01 : 0.0001;
@@ -281,59 +283,156 @@ class ExchangeWebSocket {
       return { asks, bids, spread, spreadPercentage: (spread / basePrice) * 100, lastUpdate: Date.now() };
     };
 
-    const ob = generateOB(pair.price);
-    this.orderbooks.set(symbol, ob);
-    this._emit(channel, ob);
+    const parseBackendOB = (data: any, basePrice: number): Orderbook | null => {
+      const rawBids: any[] = data.bids || [];
+      const rawAsks: any[] = data.asks || [];
+      if (rawBids.length === 0 && rawAsks.length === 0) return null;
 
-    const interval = setInterval(() => {
+      const bids = rawBids.map(l => ({
+        price: parseFloat(l.price),
+        quantity: parseFloat(l.quantity),
+        total: parseFloat(l.total),
+        percentage: 0,
+      }));
+      const asks = rawAsks.map(l => ({
+        price: parseFloat(l.price),
+        quantity: parseFloat(l.quantity),
+        total: parseFloat(l.total),
+        percentage: 0,
+      }));
+
+      const maxTotal = Math.max(
+        bids.length > 0 ? bids[bids.length - 1].total : 0,
+        asks.length > 0 ? asks[asks.length - 1].total : 0,
+      );
+      if (maxTotal > 0) {
+        bids.forEach(l => (l.percentage = (l.total / maxTotal) * 100));
+        asks.forEach(l => (l.percentage = (l.total / maxTotal) * 100));
+      }
+
+      const bestBid = bids.length > 0 ? bids[0].price : basePrice;
+      const bestAsk = asks.length > 0 ? asks[0].price : basePrice;
+      const spread = bestAsk - bestBid;
+      return { asks, bids, spread, spreadPercentage: basePrice > 0 ? (spread / basePrice) * 100 : 0, lastUpdate: Date.now() };
+    };
+
+    const fetchAndEmit = async () => {
       const currentPair = this.tradingPairs.get(symbol);
-      if (!currentPair) return;
-      const updated = generateOB(currentPair.price);
-      this.orderbooks.set(symbol, updated);
-      this._emit(channel, updated);
-    }, 1000);
+      const price = currentPair?.price || pair.price;
+      try {
+        const res = await fetch(`/api/trading/orderbook/${encodeURIComponent(dashSymbol)}?limit=25`);
+        if (res.ok) {
+          const data = await res.json();
+          const ob = parseBackendOB(data, price);
+          if (ob) {
+            this.orderbooks.set(symbol, ob);
+            this._emit(channel, ob);
+            return;
+          }
+        }
+      } catch { /* fall through to synthetic */ }
+      const ob = generateSyntheticOB(price);
+      this.orderbooks.set(symbol, ob);
+      this._emit(channel, ob);
+    };
 
+    fetchAndEmit();
+    const interval = setInterval(fetchAndEmit, 2000);
     this.intervals.set(channel, interval);
   }
 
   /**
-   * Generate trades from real price data.
+   * Fetch real trades from backend, then poll for new ones.
+   * Falls back to synthetic trades if backend returns empty.
    */
   private _startTradeUpdates(symbol: string): void {
     const channel = `trades:${symbol}`;
     const pair = this.tradingPairs.get(symbol);
     if (!pair) return;
 
-    // Send initial trades
-    const initial: Trade[] = [];
-    let t = Date.now();
-    for (let i = 0; i < 20; i++) {
-      initial.push({
-        id: generateId(),
-        price: pair.price + (Math.random() - 0.5) * pair.price * 0.001,
-        quantity: Math.random() * 2 + 0.01,
-        side: Math.random() > 0.5 ? 'buy' : 'sell',
-        timestamp: t,
-      });
-      t -= Math.floor(Math.random() * 5000) + 100;
-    }
-    this.recentTrades.set(symbol, initial);
-    this._emit(channel, initial);
+    const dashSymbol = symbol.replace('/', '-');
+    let hasRealData = false;
 
-    const interval = setInterval(() => {
-      const currentPair = this.tradingPairs.get(symbol);
-      if (!currentPair) return;
-      const trade: Trade = {
-        id: generateId(),
-        price: currentPair.price + (Math.random() - 0.5) * currentPair.price * 0.0001,
-        quantity: Math.random() * 0.5 + 0.001,
-        side: Math.random() > 0.5 ? 'buy' : 'sell',
-        timestamp: Date.now(),
-      };
-      const trades = this.recentTrades.get(symbol) || [];
-      this.recentTrades.set(symbol, [trade, ...trades.slice(0, 99)]);
-      this._emit(channel, [trade]);
-    }, 500 + Math.random() * 1500);
+    const fetchRealTrades = async (): Promise<Trade[]> => {
+      try {
+        const res = await fetch(`/api/trading/trades/${encodeURIComponent(dashSymbol)}?limit=50`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        const trades: any[] = data.trades || [];
+        if (trades.length === 0) return [];
+        hasRealData = true;
+        return trades.map((t: any) => ({
+          id: t.id,
+          price: parseFloat(t.price),
+          quantity: parseFloat(t.quantity),
+          side: t.side as 'buy' | 'sell',
+          timestamp: new Date(t.executed_at).getTime(),
+        }));
+      } catch {
+        return [];
+      }
+    };
+
+    const generateSyntheticTrades = (): Trade[] => {
+      const initial: Trade[] = [];
+      let t = Date.now();
+      for (let i = 0; i < 20; i++) {
+        const currentPair = this.tradingPairs.get(symbol);
+        const baseP = currentPair?.price || pair.price;
+        initial.push({
+          id: generateId(),
+          price: baseP + (Math.random() - 0.5) * baseP * 0.001,
+          quantity: Math.random() * 2 + 0.01,
+          side: Math.random() > 0.5 ? 'buy' : 'sell',
+          timestamp: t,
+        });
+        t -= Math.floor(Math.random() * 5000) + 100;
+      }
+      return initial;
+    };
+
+    const init = async () => {
+      const realTrades = await fetchRealTrades();
+      if (realTrades.length > 0) {
+        this.recentTrades.set(symbol, realTrades);
+        this._emit(channel, realTrades);
+      } else {
+        const synth = generateSyntheticTrades();
+        this.recentTrades.set(symbol, synth);
+        this._emit(channel, synth);
+      }
+    };
+
+    init();
+
+    const interval = setInterval(async () => {
+      if (hasRealData) {
+        const fresh = await fetchRealTrades();
+        if (fresh.length > 0) {
+          const existing = this.recentTrades.get(symbol) || [];
+          const existingIds = new Set(existing.map(t => t.id));
+          const newTrades = fresh.filter(t => !existingIds.has(t.id));
+          if (newTrades.length > 0) {
+            const merged = [...newTrades, ...existing].slice(0, 100);
+            this.recentTrades.set(symbol, merged);
+            this._emit(channel, newTrades);
+          }
+        }
+      } else {
+        const currentPair = this.tradingPairs.get(symbol);
+        if (!currentPair) return;
+        const trade: Trade = {
+          id: generateId(),
+          price: currentPair.price + (Math.random() - 0.5) * currentPair.price * 0.0001,
+          quantity: Math.random() * 0.5 + 0.001,
+          side: Math.random() > 0.5 ? 'buy' : 'sell',
+          timestamp: Date.now(),
+        };
+        const trades = this.recentTrades.get(symbol) || [];
+        this.recentTrades.set(symbol, [trade, ...trades.slice(0, 99)]);
+        this._emit(channel, [trade]);
+      }
+    }, hasRealData ? 3000 : 800 + Math.random() * 1200);
 
     this.intervals.set(channel, interval);
   }

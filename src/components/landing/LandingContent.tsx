@@ -6,7 +6,7 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { ArrowRight, Play } from 'lucide-react';
-import { Features, MarketTicker, Stats, CTA } from '@/components/landing';
+import { Features, MarketTicker, Stats, CTA, FAQ } from '@/components/landing';
 import { Button, Skeleton } from '@/components/ui';
 import { isEnabled } from '@/lib/feature-flags';
 
@@ -163,6 +163,7 @@ export function LandingSections() {
       <MarketTicker />
       <Features />
       <Stats />
+      <FAQ />
       <CTA />
     </>
   );

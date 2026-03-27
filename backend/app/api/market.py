@@ -1,10 +1,10 @@
 """
-Public market data routes — trading pairs, tickers, orderbook.
-Price data is currently sourced from internal state.
-In production, this would integrate with external feeds (Binance, etc.)
+Public market data routes — trading pairs, tickers, orderbook, klines.
+Price data sourced from Binance API via backend cache / proxy.
 """
 
-from fastapi import APIRouter, Depends
+import httpx
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +14,9 @@ from app.models.cms import SystemFlag
 from app.services.market_data import get_market_data_service
 
 router = APIRouter(prefix="/api/market", tags=["market"])
+
+BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
+VALID_INTERVALS = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 
 
 @router.get("/pairs")
@@ -73,6 +76,45 @@ async def get_market_tickers():
     market = get_market_data_service()
     tickers = await market.fetch_tickers()
     return {"tickers": tickers}
+
+
+@router.get("/klines")
+async def get_klines(
+    symbol: str = Query(..., description="Trading pair e.g. BTC-USDT or BTCUSDT"),
+    interval: str = Query("15m", description="Candle interval"),
+    limit: int = Query(200, ge=1, le=1000),
+):
+    """Proxy Binance klines for charting. Converts our symbol format to Binance format."""
+    if interval not in VALID_INTERVALS:
+        raise HTTPException(status_code=400, detail=f"Invalid interval: {interval}")
+
+    binance_symbol = symbol.upper().replace("-", "").replace("/", "")
+    if not binance_symbol.endswith("USDT"):
+        binance_symbol += "USDT"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                BINANCE_KLINES_URL,
+                params={"symbol": binance_symbol, "interval": interval, "limit": limit},
+            )
+            resp.raise_for_status()
+            raw = resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to fetch klines from upstream")
+
+    candles = [
+        {
+            "time": int(k[0]) // 1000,
+            "open": float(k[1]),
+            "high": float(k[2]),
+            "low": float(k[3]),
+            "close": float(k[4]),
+            "volume": float(k[5]),
+        }
+        for k in raw
+    ]
+    return {"symbol": binance_symbol, "interval": interval, "candles": candles}
 
 
 @router.get("/deposit-methods")

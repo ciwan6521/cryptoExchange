@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Toaster } from 'sonner';
 import { Providers } from '@/components/providers/Providers';
 import './globals.css';
 
@@ -76,7 +77,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5,
   themeColor: '#0a0b0c',
 };
 
@@ -102,6 +103,20 @@ export default function RootLayout({
         
         {/* Main application — Providers initializes WS + global store */}
         <Providers>{children}</Providers>
+        <Toaster
+          theme="dark"
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: 'rgba(17, 19, 23, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              color: '#e5e7eb',
+              backdropFilter: 'blur(12px)',
+            },
+          }}
+          richColors
+          closeButton
+        />
         
         {/* Performance hint - preconnect to API */}
         <link rel="preconnect" href="https://api.crypto4pro.io" />

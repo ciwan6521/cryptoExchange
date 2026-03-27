@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { Info, AlertCircle, Lock } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
 import { Button, NumberInput, Select } from '@/components/ui';
@@ -51,8 +52,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   baseAsset,
   quoteAsset,
   currentPrice,
-  availableBase = 1.5,
-  availableQuote = 50000,
+  availableBase = 0,
+  availableQuote = 0,
   onSubmit,
 }) => {
   const precision = useMemo(() => getPrecision(symbol), [symbol]);
@@ -158,9 +159,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       onSubmit?.(orderData);
       setQuantity('');
       setError(null);
+      toast.success(`${side === 'buy' ? 'Buy' : 'Sell'} order placed`, {
+        description: `${quantity} ${baseAsset} @ ${orderType === 'market' ? 'market price' : price + ' ' + quoteAsset}`,
+      });
     } catch (e) {
       const msg = e instanceof ApiError ? e.detail : 'Order placement failed';
       setError(msg);
+      toast.error('Order failed', { description: msg });
     } finally {
       setIsSubmitting(false);
     }

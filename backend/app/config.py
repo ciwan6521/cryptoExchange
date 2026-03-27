@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     ALCHEMY_API_KEY: str = ""
     TRON_API_KEY: str = ""
 
+    # ── Pay4Pro Integration ──
+    PAY4PRO_BASE_URL: str = ""
+    PAY4PRO_API_KEY: str = ""
+    PAY4PRO_WEBHOOK_SECRET: str = ""
+    PAY4PRO_DEFAULT_ASSET: str = "USDT"
+    PAY4PRO_DEFAULT_NETWORK: str = "BSC"
+
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
     AUTH_RATE_LIMIT_PER_MINUTE: int = 10
@@ -60,6 +67,15 @@ class Settings(BaseSettings):
 
     # ── Admin Self-Protection ──
     ADMIN_LARGE_CREDIT_THRESHOLD: str = "10000"        # Require 2nd admin above this
+
+    # ── Email / SMTP ──
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@crypto4pro.io"
+    SMTP_FROM_NAME: str = "Crypto4Pro"
+    BASE_URL: str = "https://crypto4pro.io"
 
     # ── Alerting ──
     ALERT_WEBHOOK_URL: str = ""  # Slack/Discord webhook URL (empty = log only)

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, Chrome } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Chrome, Shield } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -18,6 +18,8 @@ export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
   const [isLoading, setIsLoading] = useState(false);
+  const [needs2FA, setNeeds2FA] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -65,10 +67,17 @@ export default function LoginPage() {
       await login({
         email: formData.email,
         password: formData.password,
+        totp_code: needs2FA ? totpCode : undefined,
       });
       router.push('/dashboard');
     } catch (err: any) {
-      setErrors({ form: err?.detail || err?.message || 'Login failed. Please try again.' });
+      const detail = err?.detail || err?.message || '';
+      if (detail === '2FA code required') {
+        setNeeds2FA(true);
+        setErrors({});
+      } else {
+        setErrors({ form: detail || 'Login failed. Please try again.' });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +143,23 @@ export default function LoginPage() {
           autoComplete="current-password"
         />
         
+        {/* 2FA Code */}
+        {needs2FA && (
+          <div className="p-4 rounded-lg bg-brand-500/10 border border-brand-500/20">
+            <p className="text-sm text-brand-400 mb-3 font-medium">Enter your 2FA code</p>
+            <Input
+              label="Authentication Code"
+              name="totp_code"
+              type="text"
+              placeholder="000000"
+              value={totpCode}
+              onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              leftIcon={<Shield className="w-4 h-4" />}
+              autoComplete="one-time-code"
+            />
+          </div>
+        )}
+
         {/* Remember & Forgot */}
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 cursor-pointer">
