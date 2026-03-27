@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Copy, Check, Wallet, Building2, AlertTriangle, Loader2, QrCode, ArrowRight, Clock, Shield } from 'lucide-react';
+import { X, Copy, Check, Wallet, Building2, AlertTriangle, Loader2, ArrowRight, Clock, Shield } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
 import { depositApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -225,8 +226,14 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
                       {/* QR placeholder + address */}
                       <div className="p-5 rounded-2xl bg-surface-100 border border-glass-border text-center">
-                        <div className="w-40 h-40 bg-white rounded-xl mx-auto mb-4 flex items-center justify-center">
-                          <QrCode className="w-32 h-32 text-gray-800" />
+                        <div className="w-44 h-44 bg-white rounded-xl mx-auto mb-4 flex items-center justify-center p-2">
+                          <QRCodeSVG
+                            value={walletAddress}
+                            size={152}
+                            level="H"
+                            bgColor="#ffffff"
+                            fgColor="#000000"
+                          />
                         </div>
                         <label className="block text-[11px] text-gray-500 mb-2">Your Personal Deposit Address</label>
                         <code className="block text-sm text-white font-mono break-all leading-relaxed mb-3">
