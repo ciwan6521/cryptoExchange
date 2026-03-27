@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft } from 'lucide-react';
+import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
 import { depositApi, type PaymentMethod } from '@/lib/api';
@@ -42,6 +42,10 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const [deposits, setDeposits] = useState<Array<{
     id: string; asset: string; amount: string; status: string; tx_hash: string | null; created_at: string | null;
   }>>([]);
+  const [claimAmount, setClaimAmount] = useState('');
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
+  const [claimSuccess, setClaimSuccess] = useState(false);
+  const [claimError, setClaimError] = useState('');
 
   const methodTypes = useMemo(() => {
     const types = new Set(methods.map(m => m.type));
@@ -102,6 +106,39 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   if (!isOpen) return null;
 
   const filteredMethods = methods.filter(m => m.type === activeTab);
+
+  const resetClaimForm = () => {
+    setClaimAmount('');
+    setClaimSubmitting(false);
+    setClaimSuccess(false);
+    setClaimError('');
+  };
+
+  const handleClaimDeposit = async (method: PaymentMethod) => {
+    if (!claimAmount || !user) return;
+    const numAmount = parseFloat(claimAmount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setClaimError('Please enter a valid amount');
+      return;
+    }
+
+    setClaimSubmitting(true);
+    setClaimError('');
+    try {
+      await depositApi.claimDeposit({
+        amount: claimAmount,
+        currency: method.currency || 'USDT',
+        method: method.type,
+        payment_method_id: method.id,
+      });
+      setClaimSuccess(true);
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string; message?: string };
+      setClaimError(apiErr.detail || apiErr.message || 'Failed to submit claim');
+    } finally {
+      setClaimSubmitting(false);
+    }
+  };
 
   const copyToClip = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -483,7 +520,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
               ) : (
                 <div className="space-y-4">
                   <button
-                    onClick={() => setSelectedMethod(null)}
+                    onClick={() => { setSelectedMethod(null); resetClaimForm(); }}
                     className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" /> Back to list
@@ -497,6 +534,65 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                     )}
                   </div>
                   {renderMethodDetail(selectedMethod)}
+
+                  {/* Claim form for non-crypto methods */}
+                  {selectedMethod.type !== 'crypto' && user && (
+                    claimSuccess ? (
+                      <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                        <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                        <p className="text-sm font-medium text-green-400 mb-1">Deposit Claim Submitted</p>
+                        <p className="text-xs text-green-300/70">
+                          Your deposit of {claimAmount} {selectedMethod.currency || 'USDT'} is pending admin verification.
+                          You will be credited once confirmed.
+                        </p>
+                        <button
+                          onClick={resetClaimForm}
+                          className="mt-3 px-4 py-1.5 text-xs text-brand-400 hover:text-brand-300 border border-brand-500/30 rounded-lg transition-colors"
+                        >
+                          Submit Another
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-surface-100 border border-glass-border space-y-3">
+                        <p className="text-xs text-gray-400 font-medium">After sending your payment:</p>
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1.5">Amount Sent</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              value={claimAmount}
+                              onChange={e => setClaimAmount(e.target.value)}
+                              placeholder="0.00"
+                              className="flex-1 h-10 px-3 text-sm bg-white/[0.03] border border-white/[0.08] rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/40 focus:ring-1 focus:ring-brand-500/20"
+                            />
+                            <span className="flex items-center px-3 h-10 text-xs text-gray-400 bg-white/[0.03] border border-white/[0.08] rounded-lg">
+                              {selectedMethod.currency || 'USDT'}
+                            </span>
+                          </div>
+                        </div>
+                        {claimError && (
+                          <p className="text-xs text-red-400">{claimError}</p>
+                        )}
+                        <button
+                          onClick={() => handleClaimDeposit(selectedMethod)}
+                          disabled={claimSubmitting || !claimAmount}
+                          className="w-full flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                        >
+                          {claimSubmitting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          {claimSubmitting ? 'Submitting...' : "I've Sent the Payment"}
+                        </button>
+                        <p className="text-[10px] text-gray-600 text-center">
+                          Only click after you have completed the transfer. False claims may result in account restriction.
+                        </p>
+                      </div>
+                    )
+                  )}
                 </div>
               )}
             </div>

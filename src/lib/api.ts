@@ -572,6 +572,12 @@ export const depositApi = {
 
   getPaymentMethods: () =>
     request<{ methods: PaymentMethod[] }>('/api/market/deposit-methods'),
+
+  claimDeposit: (data: { amount: string; currency: string; method: string; payment_method_id?: string }) =>
+    request<{ ok: boolean; deposit: { id: string; amount: string; currency: string; method: string; status: string; transaction_id: string }; message: string }>(
+      '/api/deposits/claim',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
 };
 
 // ============================================
