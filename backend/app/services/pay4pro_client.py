@@ -302,6 +302,21 @@ class Pay4ProClient:
         )
         return result
 
+    # ── Payment Methods ──
+
+    async def get_payment_methods(self) -> list[dict]:
+        """
+        Get active payment methods from Pay4Pro.
+
+        GET /api/payment-methods
+        Returns crypto, bank_transfer, papara, etc.
+        """
+        data = await self._request("GET", "/api/payment-methods")
+
+        if isinstance(data, list):
+            return data
+        return data.get("data", data.get("methods", []))
+
     # ── Transaction Status ──
 
     async def get_transaction(self, tx_ref: str) -> dict:

@@ -1,54 +1,71 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { X, Copy, Check, Wallet, Building2, AlertTriangle, Loader2, ArrowRight, Clock, Shield } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
-import { depositApi } from '@/lib/api';
+import { depositApi, type PaymentMethod } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
-
-interface DepositMethod {
-  id: string;
-  method_type: 'crypto_wallet' | 'bank_transfer';
-  label: string;
-  asset: string | null;
-  network: string | null;
-  address: string | null;
-  memo_tag: string | null;
-  bank_name: string | null;
-  account_holder: string | null;
-  iban: string | null;
-  swift_code: string | null;
-  currency: string | null;
-  reference_note: string | null;
-  notes: string | null;
-  min_amount: string | null;
-}
 
 interface DepositModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  crypto: 'Crypto',
+  bank_transfer: 'Bank Transfer',
+  papara: 'Papara',
+  external_api: 'External',
+  manual: 'Manual',
+};
+
+const TYPE_ICONS: Record<string, React.ElementType> = {
+  crypto: Wallet,
+  bank_transfer: Building2,
+  papara: CreditCard,
+  external_api: CreditCard,
+  manual: CreditCard,
+};
+
 export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuthStore();
   const [walletAddress, setWalletAddress] = useState('');
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState('');
-  const [methods, setMethods] = useState<DepositMethod[]>([]);
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'wallet' | 'crypto' | 'bank'>('wallet');
+  const [activeTab, setActiveTab] = useState('wallet');
   const [copiedId, setCopiedId] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState<DepositMethod | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [deposits, setDeposits] = useState<Array<{
     id: string; asset: string; amount: string; status: string; tx_hash: string | null; created_at: string | null;
   }>>([]);
 
+  const methodTypes = useMemo(() => {
+    const types = new Set(methods.map(m => m.type));
+    return Array.from(types);
+  }, [methods]);
+
+  const tabs = useMemo(() => {
+    const t: { id: string; label: string; icon: React.ElementType }[] = [];
+    if (user) {
+      t.push({ id: 'wallet', label: 'My Wallet', icon: Shield });
+    }
+    for (const type of methodTypes) {
+      t.push({
+        id: type,
+        label: TYPE_LABELS[type] || type,
+        icon: TYPE_ICONS[type] || CreditCard,
+      });
+    }
+    return t;
+  }, [user, methodTypes]);
+
   useEffect(() => {
     if (!isOpen) return;
 
-    // Fetch personal wallet address (BSC)
     if (user) {
       setWalletLoading(true);
       setWalletError('');
@@ -58,10 +75,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         .finally(() => setWalletLoading(false));
     }
 
-    // Fetch admin-configured methods
     setLoading(true);
-    fetch('/api/market/deposit-methods')
-      .then(r => r.json())
+    depositApi.getPaymentMethods()
       .then(data => {
         setMethods(data.methods || []);
         setSelectedMethod(null);
@@ -77,10 +92,16 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       .catch(() => setDeposits([]));
   }, [showHistory, user]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!user && activeTab === 'wallet') {
+      setActiveTab(methodTypes[0] || 'wallet');
+    }
+  }, [isOpen, user, activeTab, methodTypes]);
+
   if (!isOpen) return null;
 
-  const cryptos = methods.filter(m => m.method_type === 'crypto_wallet');
-  const banks = methods.filter(m => m.method_type === 'bank_transfer');
+  const filteredMethods = methods.filter(m => m.type === activeTab);
 
   const copyToClip = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -104,6 +125,160 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     return 'text-red-400';
   };
 
+  const renderMethodDetail = (m: PaymentMethod) => {
+    const config = m.config || {};
+
+    if (m.type === 'crypto') {
+      const addr = (config.wallet_address || config.address || '') as string;
+      const network = (config.network || '') as string;
+      const coin = (config.coin || m.currency || '') as string;
+      const minDeposit = (config.min_deposit || '') as string;
+      const confirmations = (config.required_confirmations || '') as string;
+
+      return (
+        <div className="space-y-4">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium mb-3">
+              <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
+              {coin} — {network}
+            </div>
+          </div>
+
+          {addr && (
+            <div className="p-5 rounded-2xl bg-surface-100 border border-glass-border text-center">
+              <div className="w-44 h-44 bg-white rounded-xl mx-auto mb-4 flex items-center justify-center p-2">
+                <QRCodeSVG value={addr} size={152} level="H" bgColor="#ffffff" fgColor="#000000" />
+              </div>
+              <label className="block text-[11px] text-gray-500 mb-2">Deposit Address</label>
+              <code className="block text-sm text-white font-mono break-all leading-relaxed mb-3">{addr}</code>
+              <CopyButton text={addr} id={m.id + '-addr'} label="Copy Address" />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {confirmations && (
+              <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Shield className="w-3.5 h-3.5 text-gray-500" />
+                  <span className="text-[11px] text-gray-500">Confirmations</span>
+                </div>
+                <p className="text-sm font-medium text-white">{confirmations} blocks</p>
+              </div>
+            )}
+            {minDeposit && (
+              <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="w-3.5 h-3.5 text-gray-500" />
+                  <span className="text-[11px] text-gray-500">Min Deposit</span>
+                </div>
+                <p className="text-sm font-medium text-white">{minDeposit} {coin}</p>
+              </div>
+            )}
+          </div>
+
+          {addr && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-300">
+                <p className="font-medium mb-0.5">Only send {coin} on {network} network to this address</p>
+                <p className="text-amber-300/70">Sending tokens on wrong network may result in permanent loss of funds.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (m.type === 'bank_transfer') {
+      const bankName = (config.bank_name || config.bankName || '') as string;
+      const holder = (config.account_holder || config.accountHolder || config.holder_name || '') as string;
+      const iban = (config.iban || config.IBAN || '') as string;
+      const swift = (config.swift_code || config.swift || '') as string;
+      const currency = (config.currency || m.currency || '') as string;
+      const reference = (config.reference_note || config.reference || '') as string;
+      const minDeposit = (config.min_deposit || '') as string;
+
+      return (
+        <div className="space-y-3">
+          {bankName && (
+            <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
+              <label className="block text-[11px] text-gray-500 mb-1">Bank Name</label>
+              <p className="text-sm text-white">{bankName}</p>
+            </div>
+          )}
+          {holder && (
+            <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
+              <label className="block text-[11px] text-gray-500 mb-1">Account Holder</label>
+              <p className="text-sm text-white">{holder}</p>
+            </div>
+          )}
+          {iban && (
+            <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
+              <label className="block text-[11px] text-gray-500 mb-1">IBAN</label>
+              <div className="flex items-center justify-between gap-2">
+                <code className="text-sm text-white font-mono">{iban}</code>
+                <CopyButton text={iban} id={m.id + '-iban'} />
+              </div>
+            </div>
+          )}
+          {swift && (
+            <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
+              <label className="block text-[11px] text-gray-500 mb-1">SWIFT Code</label>
+              <div className="flex items-center justify-between gap-2">
+                <code className="text-sm text-white font-mono">{swift}</code>
+                <CopyButton text={swift} id={m.id + '-swift'} />
+              </div>
+            </div>
+          )}
+          {currency && (
+            <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
+              <label className="block text-[11px] text-gray-500 mb-1">Currency</label>
+              <p className="text-sm text-white">{currency}</p>
+            </div>
+          )}
+          {reference && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-300">{reference}</p>
+            </div>
+          )}
+          {minDeposit && (
+            <p className="text-xs text-gray-500">
+              Minimum deposit: <span className="text-white font-medium">{minDeposit} {currency}</span>
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    const entries = Object.entries(config).filter(
+      ([, v]) => v !== null && v !== undefined && v !== ''
+    );
+    const displayAddr = (config.wallet_address || config.address || config.account_number || config.papara_number || '') as string;
+
+    return (
+      <div className="space-y-3">
+        {displayAddr && (
+          <div className="p-4 rounded-xl bg-surface-100 border border-glass-border">
+            <label className="block text-[11px] text-gray-500 mb-1.5">Account / Address</label>
+            <div className="flex items-start justify-between gap-2">
+              <code className="text-sm text-white font-mono break-all leading-relaxed">{displayAddr}</code>
+              <CopyButton text={displayAddr} id={m.id + '-addr'} />
+            </div>
+          </div>
+        )}
+        {entries
+          .filter(([k]) => !['wallet_address', 'address', 'account_number', 'papara_number'].includes(k))
+          .map(([key, val]) => (
+            <div key={key} className="p-3 rounded-xl bg-surface-100 border border-glass-border">
+              <label className="block text-[11px] text-gray-500 mb-1 capitalize">{key.replace(/_/g, ' ')}</label>
+              <p className="text-sm text-white">{String(val)}</p>
+            </div>
+          ))}
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <div
@@ -114,17 +289,19 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         <div className="px-6 py-4 border-b border-glass-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-display font-bold text-white">Deposit</h2>
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              className={cn(
-                "text-xs px-2.5 py-1 rounded-lg border transition-colors",
-                showHistory
-                  ? "bg-brand-500/10 text-brand-400 border-brand-500/30"
-                  : "text-gray-500 border-glass-border hover:text-gray-300"
-              )}
-            >
-              {showHistory ? 'Back' : 'History'}
-            </button>
+            {user && (
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className={cn(
+                  "text-xs px-2.5 py-1 rounded-lg border transition-colors",
+                  showHistory
+                    ? "bg-brand-500/10 text-brand-400 border-brand-500/30"
+                    : "text-gray-500 border-glass-border hover:text-gray-300"
+                )}
+              >
+                {showHistory ? 'Back' : 'History'}
+              </button>
+            )}
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
@@ -132,7 +309,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         </div>
 
         {showHistory ? (
-          /* Deposit History */
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {deposits.length === 0 ? (
               <p className="text-center text-sm text-gray-500 py-12">No deposits yet</p>
@@ -167,43 +343,34 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
           <>
             {/* Tab selector */}
             <div className="px-6 pt-4 shrink-0">
-              <div className="flex gap-1 p-1 bg-surface-100 rounded-xl">
-                {user && (
-                  <button
-                    onClick={() => { setTab('wallet'); setSelectedMethod(null); }}
-                    className={cn(
-                      'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors',
-                      tab === 'wallet' ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
-                    )}
-                  >
-                    <Shield className="w-4 h-4" /> My Wallet
-                  </button>
-                )}
-                <button
-                  onClick={() => { setTab('crypto'); setSelectedMethod(null); }}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors',
-                    tab === 'crypto' ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
-                  )}
-                >
-                  <Wallet className="w-4 h-4" /> Crypto
-                </button>
-                <button
-                  onClick={() => { setTab('bank'); setSelectedMethod(null); }}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors',
-                    tab === 'bank' ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
-                  )}
-                >
-                  <Building2 className="w-4 h-4" /> Bank
-                </button>
-              </div>
+              {loading && tabs.length <= 1 ? (
+                <div className="flex items-center justify-center py-2">
+                  <Loader2 className="w-4 h-4 text-brand-400 animate-spin" />
+                </div>
+              ) : (
+                <div className="flex gap-1 p-1 bg-surface-100 rounded-xl overflow-x-auto">
+                  {tabs.map(t => {
+                    const Icon = t.icon;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => { setActiveTab(t.id); setSelectedMethod(null); }}
+                        className={cn(
+                          'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors whitespace-nowrap min-w-0',
+                          activeTab === t.id ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
+                        )}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" /> {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {tab === 'wallet' ? (
-                /* Personal Pay4Pro wallet address */
+              {activeTab === 'wallet' ? (
                 <div className="space-y-4">
                   {walletLoading ? (
                     <div className="flex items-center justify-center py-12">
@@ -224,7 +391,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                         </div>
                       </div>
 
-                      {/* QR placeholder + address */}
                       <div className="p-5 rounded-2xl bg-surface-100 border border-glass-border text-center">
                         <div className="w-44 h-44 bg-white rounded-xl mx-auto mb-4 flex items-center justify-center p-2">
                           <QRCodeSVG
@@ -242,7 +408,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                         <CopyButton text={walletAddress} id="personal-addr" label="Copy Address" />
                       </div>
 
-                      {/* Info cards */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
                           <div className="flex items-center gap-2 mb-1">
@@ -278,111 +443,60 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
                 </div>
-              ) : (tab === 'crypto' ? cryptos : banks).length === 0 ? (
+              ) : filteredMethods.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-12 h-12 rounded-xl bg-surface-100 flex items-center justify-center mx-auto mb-3">
-                    {tab === 'crypto' ? <Wallet className="w-6 h-6 text-gray-500" /> : <Building2 className="w-6 h-6 text-gray-500" />}
+                    <CreditCard className="w-6 h-6 text-gray-500" />
                   </div>
-                  <p className="text-sm text-gray-400">No {tab === 'crypto' ? 'crypto methods' : 'bank accounts'} configured</p>
+                  <p className="text-sm text-gray-400">No {TYPE_LABELS[activeTab] || activeTab} methods available</p>
                   <p className="text-xs text-gray-600 mt-1">Contact support for deposit instructions</p>
                 </div>
               ) : !selectedMethod ? (
                 <div className="space-y-2">
-                  {(tab === 'crypto' ? cryptos : banks).map(m => (
-                    <button
-                      key={m.id}
-                      onClick={() => setSelectedMethod(m)}
-                      className="w-full p-4 rounded-xl border border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/5 transition-colors text-left flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
-                          <span className="text-brand-400 font-bold text-xs">
-                            {m.asset ? m.asset.slice(0, 3) : m.currency ? m.currency.slice(0, 3) : '?'}
-                          </span>
+                  {filteredMethods.map(m => {
+                    const coin = (m.config?.coin || m.config?.currency || m.currency || '') as string;
+                    const network = (m.config?.network || '') as string;
+                    const bankName = (m.config?.bank_name || m.config?.bankName || '') as string;
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => setSelectedMethod(m)}
+                        className="w-full p-4 rounded-xl border border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/5 transition-colors text-left flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
+                            <span className="text-brand-400 font-bold text-xs">
+                              {coin ? coin.slice(0, 4) : m.currency ? m.currency.slice(0, 4) : '?'}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-white">{m.name}</div>
+                            {network && <div className="text-xs text-gray-500">{network}</div>}
+                            {bankName && <div className="text-xs text-gray-500">{bankName}</div>}
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-white">{m.label}</div>
-                          {m.network && <div className="text-xs text-gray-500">{m.network}</div>}
-                          {m.bank_name && <div className="text-xs text-gray-500">{m.bank_name}</div>}
-                        </div>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-gray-600" />
-                    </button>
-                  ))}
+                        <ArrowRight className="w-4 h-4 text-gray-600" />
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="space-y-4">
                   <button
                     onClick={() => setSelectedMethod(null)}
-                    className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
+                    className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
                   >
-                    &larr; Back to list
+                    <ChevronLeft className="w-3.5 h-3.5" /> Back to list
                   </button>
-                  <div className="text-center mb-4">
-                    <h3 className="text-base font-semibold text-white">{selectedMethod.label}</h3>
-                    {selectedMethod.network && (
+                  <div className="text-center mb-2">
+                    <h3 className="text-base font-semibold text-white">{selectedMethod.name}</h3>
+                    {selectedMethod.currency && (
                       <span className="inline-block mt-1 px-2 py-0.5 text-[10px] bg-brand-500/10 text-brand-400 rounded-full">
-                        {selectedMethod.network}
+                        {selectedMethod.currency}
                       </span>
                     )}
                   </div>
-                  {selectedMethod.method_type === 'crypto_wallet' && selectedMethod.address && (
-                    <div className="p-4 rounded-xl bg-surface-100 border border-glass-border">
-                      <label className="block text-[11px] text-gray-500 mb-1.5">Deposit Address</label>
-                      <div className="flex items-start justify-between gap-2">
-                        <code className="text-sm text-white font-mono break-all leading-relaxed">{selectedMethod.address}</code>
-                        <CopyButton text={selectedMethod.address} id={selectedMethod.id + '-addr'} />
-                      </div>
-                    </div>
-                  )}
-                  {selectedMethod.method_type === 'bank_transfer' && (
-                    <div className="space-y-3">
-                      {selectedMethod.bank_name && (
-                        <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
-                          <label className="block text-[11px] text-gray-500 mb-1">Bank Name</label>
-                          <p className="text-sm text-white">{selectedMethod.bank_name}</p>
-                        </div>
-                      )}
-                      {selectedMethod.iban && (
-                        <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
-                          <label className="block text-[11px] text-gray-500 mb-1">IBAN</label>
-                          <div className="flex items-center justify-between gap-2">
-                            <code className="text-sm text-white font-mono">{selectedMethod.iban}</code>
-                            <CopyButton text={selectedMethod.iban} id={selectedMethod.id + '-iban'} />
-                          </div>
-                        </div>
-                      )}
-                      {selectedMethod.swift_code && (
-                        <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
-                          <label className="block text-[11px] text-gray-500 mb-1">SWIFT Code</label>
-                          <div className="flex items-center justify-between gap-2">
-                            <code className="text-sm text-white font-mono">{selectedMethod.swift_code}</code>
-                            <CopyButton text={selectedMethod.swift_code} id={selectedMethod.id + '-swift'} />
-                          </div>
-                        </div>
-                      )}
-                      {selectedMethod.account_holder && (
-                        <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
-                          <label className="block text-[11px] text-gray-500 mb-1">Account Holder</label>
-                          <p className="text-sm text-white">{selectedMethod.account_holder}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {selectedMethod.reference_note && (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                      <p className="text-xs text-amber-300">{selectedMethod.reference_note}</p>
-                    </div>
-                  )}
-                  {selectedMethod.notes && (
-                    <p className="text-xs text-gray-500 leading-relaxed">{selectedMethod.notes}</p>
-                  )}
-                  {selectedMethod.min_amount && (
-                    <p className="text-xs text-gray-500">
-                      Minimum deposit: <span className="text-white font-medium">{selectedMethod.min_amount} {selectedMethod.asset || selectedMethod.currency || ''}</span>
-                    </p>
-                  )}
+                  {renderMethodDetail(selectedMethod)}
                 </div>
               )}
             </div>
@@ -392,7 +506,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         {/* Footer */}
         <div className="px-6 py-3 border-t border-glass-border shrink-0">
           <p className="text-[11px] text-gray-600 text-center">
-            Deposits are credited after network confirmation. Contact support for assistance.
+            Deposits are credited after confirmation. Contact support for assistance.
           </p>
         </div>
       </div>

@@ -18,7 +18,6 @@ import {
   LogOut,
   ChevronLeft,
   CreditCard,
-  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminStore, type AdminPermissions } from '@/stores/admin-store';
@@ -56,7 +55,6 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: 'Configuration',
     items: [
       { name: 'Markets', href: '/admin/markets', icon: BarChart3, permission: 'canManageMarkets' },
-      { name: 'Deposit Methods', href: '/admin/deposit-methods', icon: Building2, permission: 'canManageMarkets' },
       { name: 'System Flags', href: '/admin/flags', icon: Flag, permission: 'canManageFlags' },
       { name: 'Campaigns', href: '/admin/campaigns', icon: Megaphone, permission: 'canManageCampaigns' },
       { name: 'CMS', href: '/admin/cms', icon: FileText, permission: 'canManageCMS' },

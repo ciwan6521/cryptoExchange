@@ -54,7 +54,6 @@ from app.api.admin.logs import router as admin_logs_router
 from app.api.admin.withdrawals import router as admin_withdrawals_router
 from app.api.admin.reconciliation import router as admin_reconciliation_router
 from app.api.admin.wallet import router as admin_wallet_router
-from app.api.admin.deposit_methods import router as admin_deposit_methods_router
 from app.api.admin.orders import router as admin_orders_router
 from app.api.admin.wallets_admin import router as admin_wallets_ops_router
 
@@ -162,7 +161,6 @@ app.include_router(admin_logs_router)
 app.include_router(admin_withdrawals_router)
 app.include_router(admin_reconciliation_router)
 app.include_router(admin_wallet_router)
-app.include_router(admin_deposit_methods_router)
 app.include_router(admin_orders_router)
 app.include_router(admin_wallets_ops_router)
 

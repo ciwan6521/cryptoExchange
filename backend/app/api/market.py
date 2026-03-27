@@ -118,34 +118,15 @@ async def get_klines(
 
 
 @router.get("/deposit-methods")
-async def get_deposit_methods(db: AsyncSession = Depends(get_db)):
-    """Get active deposit methods (crypto wallets & bank accounts) for users."""
-    from app.models.deposit_method import DepositMethod
-    result = await db.execute(
-        select(DepositMethod)
-        .where(DepositMethod.is_active == True)
-        .order_by(DepositMethod.sort_order, DepositMethod.created_at)
-    )
-    methods = result.scalars().all()
-    return {
-        "methods": [
-            {
-                "id": str(m.id),
-                "method_type": m.method_type,
-                "label": m.label,
-                "asset": m.asset,
-                "network": m.network,
-                "address": m.address,
-                "memo_tag": m.memo_tag,
-                "bank_name": m.bank_name,
-                "account_holder": m.account_holder,
-                "iban": m.iban,
-                "swift_code": m.swift_code,
-                "currency": m.currency,
-                "reference_note": m.reference_note,
-                "notes": m.notes,
-                "min_amount": m.min_amount,
-            }
-            for m in methods
-        ]
-    }
+async def get_deposit_methods():
+    """Get active payment methods from Pay4Pro."""
+    import logging
+    _log = logging.getLogger("crypto4pro")
+    try:
+        from app.services.pay4pro_client import Pay4ProClient
+        client = Pay4ProClient()
+        methods = await client.get_payment_methods()
+        return {"methods": methods}
+    except Exception as exc:
+        _log.warning("Failed to fetch payment methods from Pay4Pro: %s", exc)
+        return {"methods": []}

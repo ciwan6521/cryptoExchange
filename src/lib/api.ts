@@ -540,6 +540,16 @@ export interface DepositNetwork {
   estimated_time: string;
 }
 
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  type: string;
+  config: Record<string, unknown>;
+  currency: string;
+  country: string;
+  is_active?: boolean;
+}
+
 export const depositApi = {
   getAddress: (asset = 'USDT', network = 'BSC') =>
     request<{ address: string; asset: string; network: string }>(
@@ -559,6 +569,9 @@ export const depositApi = {
 
   getNetworks: () =>
     request<{ networks: DepositNetwork[] }>('/api/deposits/networks'),
+
+  getPaymentMethods: () =>
+    request<{ methods: PaymentMethod[] }>('/api/market/deposit-methods'),
 };
 
 // ============================================
