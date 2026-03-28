@@ -531,13 +531,16 @@ export interface DepositItem {
   completed_at: string | null;
 }
 
-export interface DepositNetwork {
-  asset: string;
-  network: string;
+export interface ChainToken {
+  symbol: string;
+  decimals: number;
+}
+
+export interface ChainInfo {
   name: string;
-  min_deposit: string;
-  confirmations_required: number;
-  estimated_time: string;
+  displayName: string;
+  gasToken: string;
+  tokens: ChainToken[];
 }
 
 export interface PaymentMethod {
@@ -551,9 +554,12 @@ export interface PaymentMethod {
 }
 
 export const depositApi = {
-  getAddress: (asset = 'USDT', network = 'BSC') =>
-    request<{ address: string; asset: string; network: string }>(
-      `/api/deposits/address`,
+  getChains: () =>
+    request<{ chains: ChainInfo[] }>('/api/deposits/chains'),
+
+  getAddress: (chain = 'bsc') =>
+    request<{ address: string; chain: string }>(
+      `/api/deposits/address?chain=${encodeURIComponent(chain)}`,
     ),
 
   getHistory: (params?: { status?: string; limit?: number; offset?: number }) => {
@@ -566,9 +572,6 @@ export const depositApi = {
       `/api/deposits/my${qs ? `?${qs}` : ''}`,
     );
   },
-
-  getNetworks: () =>
-    request<{ networks: DepositNetwork[] }>('/api/deposits/networks'),
 
   getPaymentMethods: () =>
     request<{ methods: PaymentMethod[] }>('/api/market/deposit-methods'),

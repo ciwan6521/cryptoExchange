@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, ChevronDown, Send, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
-import { depositApi, type PaymentMethod } from '@/lib/api';
+import { depositApi, type PaymentMethod, type ChainInfo } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 
 interface DepositModalProps {
@@ -28,24 +28,57 @@ const TYPE_ICONS: Record<string, React.ElementType> = {
   manual: CreditCard,
 };
 
+const CHAIN_CONFIRMATIONS: Record<string, { blocks: number; time: string }> = {
+  bsc: { blocks: 15, time: '~1 min' },
+  ethereum: { blocks: 12, time: '~3 min' },
+};
+
 export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuthStore();
+
+  // Chain & token state
+  const [chains, setChains] = useState<ChainInfo[]>([]);
+  const [selectedChain, setSelectedChain] = useState<string>('bsc');
+  const [selectedToken, setSelectedToken] = useState<string>('USDT');
+  const [chainDropdownOpen, setChainDropdownOpen] = useState(false);
+
+  // Wallet address
   const [walletAddress, setWalletAddress] = useState('');
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState('');
+
+  // Payment methods
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('wallet');
   const [copiedId, setCopiedId] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
+
+  // History
   const [showHistory, setShowHistory] = useState(false);
   const [deposits, setDeposits] = useState<Array<{
     id: string; asset: string; amount: string; status: string; tx_hash: string | null; created_at: string | null;
   }>>([]);
+
+  // Claim state
   const [claimAmount, setClaimAmount] = useState('');
   const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [claimSuccess, setClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState('');
+
+  const currentChain = useMemo(
+    () => chains.find(c => c.name === selectedChain),
+    [chains, selectedChain],
+  );
+
+  const availableTokens = useMemo(() => {
+    if (!currentChain) return [];
+    const gasToken = currentChain.gasToken;
+    return [
+      { symbol: gasToken, decimals: 18, isGas: true },
+      ...currentChain.tokens.map(t => ({ ...t, isGas: false })),
+    ];
+  }, [currentChain]);
 
   const methodTypes = useMemo(() => {
     const types = new Set(methods.map(m => m.type));
@@ -67,17 +100,33 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     return t;
   }, [user, methodTypes]);
 
+  const fetchAddress = useCallback(async (chain: string) => {
+    if (!user) return;
+    setWalletLoading(true);
+    setWalletError('');
+    try {
+      const data = await depositApi.getAddress(chain);
+      setWalletAddress(data.address);
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      setWalletError(apiErr.detail || 'Failed to load deposit address');
+    } finally {
+      setWalletLoading(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!isOpen) return;
 
-    if (user) {
-      setWalletLoading(true);
-      setWalletError('');
-      depositApi.getAddress('USDT', 'BSC')
-        .then(data => setWalletAddress(data.address))
-        .catch(err => setWalletError(err.detail || 'Failed to load deposit address'))
-        .finally(() => setWalletLoading(false));
-    }
+    depositApi.getChains()
+      .then(data => {
+        const ch = data.chains || [];
+        setChains(ch);
+        if (ch.length > 0 && !ch.find(c => c.name === selectedChain)) {
+          setSelectedChain(ch[0].name);
+        }
+      })
+      .catch(() => setChains([]));
 
     setLoading(true);
     depositApi.getPaymentMethods()
@@ -87,7 +136,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       })
       .catch(() => setMethods([]))
       .finally(() => setLoading(false));
-  }, [isOpen, user]);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isOpen || !user || activeTab !== 'wallet') return;
+    fetchAddress(selectedChain);
+  }, [isOpen, user, activeTab, selectedChain, fetchAddress]);
 
   useEffect(() => {
     if (!showHistory || !user) return;
@@ -106,6 +160,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   if (!isOpen) return null;
 
   const filteredMethods = methods.filter(m => m.type === activeTab);
+  const chainConf = CHAIN_CONFIRMATIONS[selectedChain] || { blocks: 15, time: '~2 min' };
 
   const resetClaimForm = () => {
     setClaimAmount('');
@@ -228,7 +283,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
     if (m.type === 'bank_transfer') {
       const bankName = (config.bank_name || config.bankName || '') as string;
-      const holder = (config.account_holder || config.accountHolder || config.holder_name || '') as string;
+      const holder = (config.account_holder || config.accountHolder || config.holder_name || config.account_name || '') as string;
       const iban = (config.iban || config.IBAN || '') as string;
       const swift = (config.swift_code || config.swift || '') as string;
       const currency = (config.currency || m.currency || '') as string;
@@ -409,6 +464,83 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {activeTab === 'wallet' ? (
                 <div className="space-y-4">
+                  {/* Chain selector */}
+                  {chains.length > 0 && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setChainDropdownOpen(!chainDropdownOpen)}
+                        className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-surface-100 border border-glass-border hover:border-brand-500/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center">
+                            <Wallet className="w-4 h-4 text-brand-400" />
+                          </div>
+                          <div className="text-left">
+                            <div className="text-sm font-medium text-white">
+                              {currentChain?.displayName || selectedChain}
+                            </div>
+                            <div className="text-[11px] text-gray-500">
+                              Gas: {currentChain?.gasToken || '—'}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform", chainDropdownOpen && "rotate-180")} />
+                      </button>
+
+                      {chainDropdownOpen && (
+                        <div className="absolute z-10 mt-1 w-full rounded-xl bg-surface-200 border border-glass-border shadow-xl overflow-hidden">
+                          {chains.map(c => (
+                            <button
+                              key={c.name}
+                              onClick={() => {
+                                setSelectedChain(c.name);
+                                setSelectedToken(c.tokens[0]?.symbol || c.gasToken);
+                                setChainDropdownOpen(false);
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.04] transition-colors",
+                                c.name === selectedChain && "bg-brand-500/5"
+                              )}
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
+                                <span className="text-brand-400 font-bold text-[10px]">{c.gasToken}</span>
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-white">{c.displayName}</div>
+                                <div className="text-[11px] text-gray-500">
+                                  {c.tokens.map(t => t.symbol).join(', ')}
+                                </div>
+                              </div>
+                              {c.name === selectedChain && (
+                                <Check className="w-4 h-4 text-brand-400 ml-auto" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Token selector pills */}
+                  {availableTokens.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {availableTokens.map(t => (
+                        <button
+                          key={t.symbol}
+                          onClick={() => setSelectedToken(t.symbol)}
+                          className={cn(
+                            "px-3 py-1.5 text-xs rounded-lg border transition-colors font-medium",
+                            selectedToken === t.symbol
+                              ? "bg-brand-500/10 text-brand-400 border-brand-500/30"
+                              : "text-gray-400 border-glass-border hover:text-gray-300 hover:border-white/[0.12]"
+                          )}
+                        >
+                          {t.symbol}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {walletLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
@@ -424,7 +556,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                       <div className="text-center">
                         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium mb-3">
                           <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
-                          USDT — BSC (BNB Smart Chain)
+                          {selectedToken} — {currentChain?.displayName || selectedChain}
                         </div>
                       </div>
 
@@ -451,21 +583,23 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                             <Clock className="w-3.5 h-3.5 text-gray-500" />
                             <span className="text-[11px] text-gray-500">Est. Time</span>
                           </div>
-                          <p className="text-sm font-medium text-white">~1 min</p>
+                          <p className="text-sm font-medium text-white">{chainConf.time}</p>
                         </div>
                         <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
                           <div className="flex items-center gap-2 mb-1">
                             <Shield className="w-3.5 h-3.5 text-gray-500" />
                             <span className="text-[11px] text-gray-500">Confirmations</span>
                           </div>
-                          <p className="text-sm font-medium text-white">15 blocks</p>
+                          <p className="text-sm font-medium text-white">{chainConf.blocks} blocks</p>
                         </div>
                       </div>
 
                       <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                         <div className="text-xs text-amber-300">
-                          <p className="font-medium mb-0.5">Only send USDT (BEP-20) on BSC network to this address</p>
+                          <p className="font-medium mb-0.5">
+                            Only send {selectedToken} on {currentChain?.displayName || selectedChain} network to this address
+                          </p>
                           <p className="text-amber-300/70">Sending tokens on wrong network may result in permanent loss of funds.</p>
                         </div>
                       </div>
@@ -535,7 +669,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                   </div>
                   {renderMethodDetail(selectedMethod)}
 
-                  {/* Claim form for non-crypto methods */}
                   {selectedMethod.type !== 'crypto' && user && (
                     claimSuccess ? (
                       <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">

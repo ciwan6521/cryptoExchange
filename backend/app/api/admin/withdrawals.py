@@ -208,12 +208,13 @@ async def approve_withdrawal(
                 from app.services.pay4pro_client import get_pay4pro_client
                 p4p = get_pay4pro_client()
                 if p4p.base_url:
+                    chain = (withdrawal.network or "bsc").lower()
                     p4p_result = await p4p.request_withdrawal(
                         user_id=str(withdrawal.user_id),
                         amount=withdrawal.amount,
                         wallet_address=withdrawal.to_address,
                         currency=withdrawal.asset,
-                        network=withdrawal.network or "BSC",
+                        chain=chain,
                         metadata={"crypto4pro_withdrawal_id": str(withdrawal.id)},
                     )
                     withdrawal.pay4pro_withdrawal_id = p4p_result.withdraw_id or p4p_result.transaction_id

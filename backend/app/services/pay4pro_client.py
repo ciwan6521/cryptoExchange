@@ -8,14 +8,14 @@ Architecture:
     Crypto4Pro (Exchange) → Pay4Pro API (Wallet Service) → QuickNode (Blockchain)
 
 Auth: X-API-Key header (project API key from Pay4Pro admin panel)
-Network: BSC (Binance Smart Chain)
+Supported chains: BSC, Ethereum (all EVM)
 Response format: {"success": true/false, "data": {...}} or {"success": false, "error": "..."}
 """
 
 import logging
 from decimal import Decimal
 from typing import Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -30,15 +30,24 @@ _MAX_RETRIES = 3
 @dataclass
 class Pay4ProWallet:
     address: str
-    asset: str
+    chain: str
     user_id: str
 
 
 @dataclass
 class Pay4ProBalance:
     address: str
+    chain: str
     balances: dict[str, Decimal]
     user_id: str
+
+
+@dataclass
+class Pay4ProChain:
+    name: str
+    display_name: str
+    gas_token: str
+    tokens: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -46,6 +55,7 @@ class Pay4ProDeposit:
     tx_hash: str
     amount: Decimal
     token: str
+    chain: str
     status: str
     from_address: str
     block_number: str
@@ -60,14 +70,6 @@ class Pay4ProWithdrawal:
     status: str
     amount: Decimal
     currency: str
-
-
-@dataclass
-class Pay4ProMasterBalance:
-    address: str
-    bnb: Decimal
-    usdt: Decimal
-    is_low_bnb: bool
 
 
 class Pay4ProError(Exception):
@@ -90,7 +92,6 @@ class Pay4ProClient:
         self.webhook_secret = settings.PAY4PRO_WEBHOOK_SECRET
 
     def _api_headers(self) -> dict:
-        """Headers for API Key authenticated requests."""
         return {
             "X-API-Key": self.api_key,
             "Content-Type": "application/json",
@@ -103,7 +104,6 @@ class Pay4ProClient:
         json_data: Optional[dict] = None,
         params: Optional[dict] = None,
     ) -> dict:
-        """Make an authenticated request to Pay4Pro with retry logic."""
         url = f"{self.base_url}{path}"
         last_error = None
 
@@ -154,38 +154,60 @@ class Pay4ProClient:
 
         raise last_error or Pay4ProError("Max retries exceeded")
 
+    # ── Chain / Network Info ──
+
+    async def get_chains(self) -> list[Pay4ProChain]:
+        """
+        Get active chains and their supported tokens.
+
+        GET /api/wallet/chains
+        """
+        data = await self._request("GET", "/api/wallet/chains")
+        chains_raw = data.get("chains", [])
+        result = []
+        for c in chains_raw:
+            result.append(Pay4ProChain(
+                name=c.get("name", ""),
+                display_name=c.get("displayName", c.get("name", "")),
+                gas_token=c.get("gasToken", ""),
+                tokens=c.get("tokens", []),
+            ))
+        return result
+
     # ── Wallet Operations ──
 
-    async def get_or_create_wallet(self, user_id: str) -> Pay4ProWallet:
+    async def get_or_create_wallet(self, user_id: str, chain: str = "bsc") -> Pay4ProWallet:
         """
-        Get or create a BSC wallet for a user.
-        Pay4Pro auto-creates the wallet if it doesn't exist.
+        Get or create a wallet for a user on the specified chain.
+        EVM chains share the same address.
 
-        GET /api/wallet/address?user_id=xxx
+        GET /api/wallet/address?user_id=xxx&chain=bsc
         """
         data = await self._request("GET", "/api/wallet/address", params={
             "user_id": user_id,
+            "chain": chain,
         })
 
         wallet = Pay4ProWallet(
             address=data["address"],
-            asset=data.get("asset", "BSC"),
+            chain=data.get("chain", chain),
             user_id=data.get("user_id", user_id),
         )
         logger.info(
-            "Pay4Pro wallet for user=%s → address=%s",
-            user_id, wallet.address,
+            "Pay4Pro wallet for user=%s chain=%s → address=%s",
+            user_id, chain, wallet.address,
         )
         return wallet
 
-    async def get_wallet_balance(self, user_id: str) -> Pay4ProBalance:
+    async def get_wallet_balance(self, user_id: str, chain: str = "bsc") -> Pay4ProBalance:
         """
-        Get on-chain balance of a user's wallet.
+        Get on-chain balance of a user's wallet on specified chain.
 
-        GET /api/wallet/balance?user_id=xxx
+        GET /api/wallet/balance?user_id=xxx&chain=bsc
         """
         data = await self._request("GET", "/api/wallet/balance", params={
             "user_id": user_id,
+            "chain": chain,
         })
 
         raw_balances = data.get("balances", {})
@@ -193,6 +215,7 @@ class Pay4ProClient:
 
         return Pay4ProBalance(
             address=data.get("address", ""),
+            chain=data.get("chain", chain),
             balances=balances,
             user_id=data.get("user_id", user_id),
         )
@@ -200,19 +223,18 @@ class Pay4ProClient:
     async def get_wallet_deposits(
         self,
         user_id: str,
+        chain: Optional[str] = None,
         page: int = 1,
         limit: int = 20,
     ) -> tuple[list[Pay4ProDeposit], int]:
         """
-        Get deposit history for a user's wallet.
-
-        GET /api/wallet/deposits?user_id=xxx&page=1&limit=20
+        GET /api/wallet/deposits?user_id=xxx&chain=bsc&page=1&limit=20
         """
-        data = await self._request("GET", "/api/wallet/deposits", params={
-            "user_id": user_id,
-            "page": page,
-            "limit": limit,
-        })
+        params: dict = {"user_id": user_id, "page": page, "limit": limit}
+        if chain:
+            params["chain"] = chain
+
+        data = await self._request("GET", "/api/wallet/deposits", params=params)
 
         deposits = []
         for d in data.get("data", []):
@@ -220,6 +242,7 @@ class Pay4ProClient:
                 tx_hash=d.get("tx_hash", ""),
                 amount=Decimal(str(d.get("amount", "0"))),
                 token=d.get("token", "USDT"),
+                chain=d.get("chain", "bsc"),
                 status=d.get("status", "unknown"),
                 from_address=d.get("from_address", ""),
                 block_number=d.get("block_number", ""),
@@ -241,7 +264,7 @@ class Pay4ProClient:
         metadata: Optional[dict] = None,
     ) -> dict:
         """
-        Create a deposit request.
+        Create a deposit request (for bank/manual methods).
 
         POST /api/deposit
         """
@@ -267,15 +290,13 @@ class Pay4ProClient:
         amount: Decimal,
         wallet_address: str,
         currency: str = "USDT",
-        network: str = "BSC",
+        chain: str = "bsc",
         metadata: Optional[dict] = None,
     ) -> Pay4ProWithdrawal:
         """
         Request a withdrawal via Pay4Pro.
 
         POST /api/withdraw
-
-        Pay4Pro will hold it for admin approval, then auto-send blockchain TX.
         """
         data = await self._request("POST", "/api/withdraw", json_data={
             "user_id": user_id,
@@ -284,7 +305,7 @@ class Pay4ProClient:
             "method": "crypto",
             "destination": {
                 "wallet_address": wallet_address,
-                "network": network,
+                "chain": chain,
             },
             "metadata": metadata or {},
         })
@@ -297,8 +318,8 @@ class Pay4ProClient:
             currency=data.get("currency", currency),
         )
         logger.info(
-            "Pay4Pro withdrawal requested: tx=%s withdraw=%s amount=%s %s to=%s",
-            result.transaction_id, result.withdraw_id, amount, currency, wallet_address,
+            "Pay4Pro withdrawal requested: tx=%s withdraw=%s amount=%s %s chain=%s to=%s",
+            result.transaction_id, result.withdraw_id, amount, currency, chain, wallet_address,
         )
         return result
 
@@ -306,13 +327,9 @@ class Pay4ProClient:
 
     async def get_payment_methods(self) -> list[dict]:
         """
-        Get active payment methods from Pay4Pro.
-
         GET /api/payment-methods
-        Returns crypto, bank_transfer, papara, etc.
         """
         data = await self._request("GET", "/api/payment-methods")
-
         if isinstance(data, list):
             return data
         return data.get("data", data.get("methods", []))
@@ -321,8 +338,6 @@ class Pay4ProClient:
 
     async def get_transaction(self, tx_ref: str) -> dict:
         """
-        Get transaction details by reference code.
-
         GET /api/transaction/:txRef
         """
         return await self._request("GET", f"/api/transaction/{tx_ref}")
@@ -330,12 +345,6 @@ class Pay4ProClient:
     # ── Webhook Verification ──
 
     def verify_webhook_secret(self, request_secret: str) -> bool:
-        """
-        Verify the X-Webhook-Secret header from Pay4Pro webhook.
-
-        Pay4Pro sends the project's webhook secret in the X-Webhook-Secret header.
-        We compare it against our configured PAY4PRO_WEBHOOK_SECRET.
-        """
         if not self.webhook_secret:
             logger.error("PAY4PRO_WEBHOOK_SECRET not configured — rejecting webhook")
             return False
@@ -344,19 +353,16 @@ class Pay4ProClient:
             logger.warning("Webhook received without X-Webhook-Secret header")
             return False
 
-        # Constant-time comparison to prevent timing attacks
         import hmac
         return hmac.compare_digest(self.webhook_secret, request_secret)
 
 
 async def _backoff(attempt: int) -> None:
-    """Exponential backoff between retries."""
     import asyncio
     delay = min(2 ** attempt, 10)
     await asyncio.sleep(delay)
 
 
-# Singleton
 _client: Optional[Pay4ProClient] = None
 
 

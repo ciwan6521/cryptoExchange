@@ -1,10 +1,10 @@
 """
 User-facing deposit API routes.
 
-- Get deposit address (from Pay4Pro — BSC wallet)
+- Get supported chains and tokens (from Pay4Pro)
+- Get deposit address per chain
 - Claim deposit (notify Pay4Pro after bank/papara transfer)
 - List deposit history
-- Create wallet on-demand if not exists
 """
 
 import uuid
@@ -35,16 +35,43 @@ class DepositClaimRequest(BaseModel):
     payment_method_id: Optional[str] = None
 
 
+@router.get("/chains")
+async def get_supported_chains():
+    """Get active chains and their supported tokens from Pay4Pro."""
+    from app.services.pay4pro_client import get_pay4pro_client, Pay4ProError
+
+    p4p = get_pay4pro_client()
+    if not p4p.base_url:
+        return {"chains": []}
+
+    try:
+        chains = await p4p.get_chains()
+        return {
+            "chains": [
+                {
+                    "name": c.name,
+                    "displayName": c.display_name,
+                    "gasToken": c.gas_token,
+                    "tokens": c.tokens,
+                }
+                for c in chains
+            ]
+        }
+    except Pay4ProError as exc:
+        logger.warning("Failed to fetch chains from Pay4Pro: %s", exc)
+        return {"chains": []}
+
+
 @router.get("/address")
 async def get_deposit_address(
+    chain: str = Query("bsc", max_length=20),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get or create a BSC deposit address for the user.
-    Calls Pay4Pro GET /api/wallet/address?user_id=xxx which auto-creates.
+    Get or create a deposit address for the user on specified chain.
+    EVM chains share the same address.
     """
-    # Look for existing wallet in our DB
     result = await db.execute(
         select(Wallet).where(
             Wallet.user_id == user.id,
@@ -56,22 +83,20 @@ async def get_deposit_address(
     if wallet and wallet.address:
         return {
             "address": wallet.address,
-            "asset": wallet.asset,
-            "network": wallet.network,
+            "chain": chain,
         }
 
-    # No wallet or no address — fetch from Pay4Pro
     from app.services.pay4pro_client import get_pay4pro_client, Pay4ProError
 
     p4p = get_pay4pro_client()
     if not p4p.base_url:
         raise HTTPException(
             status_code=503,
-            detail="Deposit service is not configured. Please try again later.",
+            detail="Deposit service is not configured.",
         )
 
     try:
-        p4p_wallet = await p4p.get_or_create_wallet(user_id=str(user.id))
+        p4p_wallet = await p4p.get_or_create_wallet(user_id=str(user.id), chain=chain)
     except Pay4ProError as e:
         logger.error("Pay4Pro wallet fetch failed for user %s: %s", user.id, e)
         raise HTTPException(status_code=503, detail="Deposit service temporarily unavailable")
@@ -93,8 +118,7 @@ async def get_deposit_address(
 
     return {
         "address": p4p_wallet.address,
-        "asset": settings.PAY4PRO_DEFAULT_ASSET,
-        "network": settings.PAY4PRO_DEFAULT_NETWORK,
+        "chain": chain,
     }
 
 
@@ -154,7 +178,6 @@ async def claim_deposit(
     """
     User claims they have sent a deposit via bank transfer / papara / etc.
     Creates a deposit request on Pay4Pro and a local pending record.
-    Pay4Pro admin will verify and confirm → webhook credits the balance.
     """
     try:
         amount = Decimal(body.amount)
@@ -216,21 +239,4 @@ async def claim_deposit(
             "transaction_id": tx_id,
         },
         "message": "Deposit claim submitted. It will be credited after admin verification.",
-    }
-
-
-@router.get("/networks")
-async def get_supported_networks():
-    """Return supported deposit networks and assets."""
-    return {
-        "networks": [
-            {
-                "asset": "USDT",
-                "network": "BSC",
-                "name": "BNB Smart Chain (BEP-20)",
-                "min_deposit": "10",
-                "confirmations_required": 15,
-                "estimated_time": "~1 minute",
-            },
-        ],
     }

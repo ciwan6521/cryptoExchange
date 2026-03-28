@@ -167,7 +167,8 @@ async def _handle_deposit_confirmed(
 
     # Create or update deposit record
     source = payload.get("source", "")
-    network = "BSC" if source == "blockchain" else (payload.get("method", "") or "manual")
+    chain = payload.get("chain", "")
+    network = chain or ("BSC" if source == "blockchain" else (payload.get("method", "") or "manual"))
 
     if existing:
         deposit = existing
@@ -305,7 +306,8 @@ async def _handle_withdraw_completed(
         "currency": "USDT",
         "status": "completed",
         "tx_hash": "0xdef456...",
-        "destination": "0xhedef_adres"
+        "destination": "0xhedef_adres",
+        "chain": "bsc"
     }
     """
     transaction_id = payload.get("transaction_id", "")

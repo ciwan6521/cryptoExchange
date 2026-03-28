@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { X, Send, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, Send, AlertTriangle, Loader2, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useBalanceStore } from '@/stores/balance-store';
+import { depositApi, type ChainInfo } from '@/lib/api';
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -13,13 +14,28 @@ interface WithdrawModalProps {
 
 export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose }) => {
   const { balances, fetchBalances } = useBalanceStore();
+  const [chains, setChains] = useState<ChainInfo[]>([]);
+  const [selectedChain, setSelectedChain] = useState('bsc');
+  const [chainDropdownOpen, setChainDropdownOpen] = useState(false);
   const [asset, setAsset] = useState('USDT');
-  const [network, setNetwork] = useState('TRC20');
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  const currentChain = useMemo(
+    () => chains.find(c => c.name === selectedChain),
+    [chains, selectedChain],
+  );
+
+  const availableTokens = useMemo(() => {
+    if (!currentChain) return [];
+    return [
+      currentChain.gasToken,
+      ...currentChain.tokens.map(t => t.symbol),
+    ];
+  }, [currentChain]);
 
   useEffect(() => {
     if (isOpen) {
@@ -28,25 +44,31 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
       setSuccess(false);
       setAddress('');
       setAmount('');
+
+      depositApi.getChains()
+        .then(data => {
+          const ch = data.chains || [];
+          setChains(ch);
+          if (ch.length > 0 && !ch.find(c => c.name === selectedChain)) {
+            setSelectedChain(ch[0].name);
+            const firstTokens = ch[0].tokens;
+            setAsset(firstTokens[0]?.symbol || ch[0].gasToken);
+          }
+        })
+        .catch(() => setChains([]));
     }
-  }, [isOpen, fetchBalances]);
+  }, [isOpen, fetchBalances]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (availableTokens.length > 0 && !availableTokens.includes(asset)) {
+      setAsset(availableTokens.find(t => t === 'USDT') || availableTokens[0]);
+    }
+  }, [availableTokens, asset]);
 
   if (!isOpen) return null;
 
   const selectedBalance = balances.find(b => b.asset === asset);
   const available = parseFloat(selectedBalance?.available || '0');
-
-  const assets = balances.length > 0
-    ? balances.map(b => b.asset)
-    : ['USDT', 'BTC', 'ETH'];
-
-  const networks = asset === 'USDT'
-    ? ['TRC20', 'ERC20', 'BEP20']
-    : asset === 'BTC'
-      ? ['Bitcoin']
-      : asset === 'ETH'
-        ? ['ERC20']
-        : ['ERC20', 'TRC20'];
 
   const handleSubmit = async () => {
     setError('');
@@ -62,7 +84,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
         credentials: 'include',
         body: JSON.stringify({
           asset,
-          network,
+          network: selectedChain,
           amount,
           to_address: address,
         }),
@@ -74,8 +96,9 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
       setSuccess(true);
       fetchBalances();
       toast.success('Withdrawal submitted', { description: `${amount} ${asset} withdrawal is pending approval.` });
-    } catch (e: any) {
-      setError(e.message || 'Withdrawal failed');
+    } catch (e: unknown) {
+      const err = e as Error;
+      setError(err.message || 'Withdrawal failed');
     }
     setSubmitting(false);
   };
@@ -114,32 +137,67 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
           </div>
         ) : (
           <div className="p-6 space-y-4">
-            {/* Asset select */}
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">Asset</label>
-              <select
-                value={asset}
-                onChange={e => { setAsset(e.target.value); setError(''); }}
-                className={inputCls + ' appearance-none'}
-              >
-                {assets.map(a => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </select>
-            </div>
+            {/* Chain selector */}
+            {chains.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Network</label>
+                <div className="relative">
+                  <button
+                    onClick={() => setChainDropdownOpen(!chainDropdownOpen)}
+                    className={cn(inputCls, 'flex items-center justify-between cursor-pointer')}
+                  >
+                    <span>{currentChain?.displayName || selectedChain}</span>
+                    <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform", chainDropdownOpen && "rotate-180")} />
+                  </button>
 
-            {/* Network select */}
+                  {chainDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-full rounded-xl bg-surface-200 border border-glass-border shadow-xl overflow-hidden">
+                      {chains.map(c => (
+                        <button
+                          key={c.name}
+                          onClick={() => {
+                            setSelectedChain(c.name);
+                            setChainDropdownOpen(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/[0.04] transition-colors text-sm",
+                            c.name === selectedChain && "bg-brand-500/5"
+                          )}
+                        >
+                          <div>
+                            <div className="text-white font-medium">{c.displayName}</div>
+                            <div className="text-[11px] text-gray-500">{c.tokens.map(t => t.symbol).join(', ')}</div>
+                          </div>
+                          {c.name === selectedChain && (
+                            <Check className="w-4 h-4 text-brand-400" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Token select */}
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">Network</label>
-              <select
-                value={network}
-                onChange={e => setNetwork(e.target.value)}
-                className={inputCls + ' appearance-none'}
-              >
-                {networks.map(n => (
-                  <option key={n} value={n}>{n}</option>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5">Token</label>
+              <div className="flex gap-2 flex-wrap">
+                {availableTokens.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => { setAsset(t); setError(''); }}
+                    className={cn(
+                      "px-3 py-2 text-xs rounded-xl border transition-colors font-medium",
+                      asset === t
+                        ? "bg-brand-500/10 text-brand-400 border-brand-500/30"
+                        : "text-gray-400 border-glass-border hover:text-gray-300 hover:border-white/[0.12] bg-surface-100"
+                    )}
+                  >
+                    {t}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
 
             {/* Address */}
