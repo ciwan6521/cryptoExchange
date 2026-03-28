@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, ChevronDown, Send, CheckCircle2 } from 'lucide-react';
+import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
 import { depositApi, type PaymentMethod, type ChainInfo } from '@/lib/api';
@@ -41,7 +41,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const [chains, setChains] = useState<ChainInfo[]>([]);
   const [selectedChain, setSelectedChain] = useState<string>('bsc');
   const [selectedToken, setSelectedToken] = useState<string>('USDT');
-  const [chainDropdownOpen, setChainDropdownOpen] = useState(false);
+
+  // Step-based flow for crypto deposit
+  const [depositStep, setDepositStep] = useState<'select' | 'address'>('select');
 
   // Wallet address
   const [walletAddress, setWalletAddress] = useState('');
@@ -89,7 +91,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const tabs = useMemo(() => {
     const t: { id: string; label: string; icon: React.ElementType }[] = [];
     if (user) {
-      t.push({ id: 'wallet', label: 'My Wallet', icon: Shield });
+      t.push({ id: 'wallet', label: 'Crypto', icon: Wallet });
     }
     for (const type of methodTypes) {
       t.push({
@@ -137,12 +139,15 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       })
       .catch(() => setMethods([]))
       .finally(() => setLoading(false));
+
+    setDepositStep('select');
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch address only when entering Step 2
   useEffect(() => {
-    if (!isOpen || !user || activeTab !== 'wallet') return;
+    if (!isOpen || !user || activeTab !== 'wallet' || depositStep !== 'address') return;
     fetchAddress(selectedChain);
-  }, [isOpen, user, activeTab, selectedChain, fetchAddress]);
+  }, [isOpen, user, activeTab, depositStep, selectedChain, fetchAddress]);
 
   useEffect(() => {
     if (!showHistory || !user) return;
@@ -168,6 +173,15 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     setClaimSubmitting(false);
     setClaimSuccess(false);
     setClaimError('');
+  };
+
+  const handleContinueToAddress = () => {
+    setDepositStep('address');
+  };
+
+  const handleBackToSelect = () => {
+    setDepositStep('select');
+    setWalletAddress('');
   };
 
   const handleClaimDeposit = async (method: PaymentMethod) => {
@@ -238,13 +252,15 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
           </div>
 
           {addr && (
-            <div className="p-5 rounded-2xl bg-surface-100 border border-glass-border text-center">
-              <div className="w-44 h-44 bg-white rounded-xl mx-auto mb-4 flex items-center justify-center p-2">
-                <QRCodeSVG value={addr} size={152} level="H" bgColor="#ffffff" fgColor="#000000" />
+            <div className="p-4 rounded-2xl bg-surface-100 border border-glass-border flex items-start gap-4">
+              <div className="w-[100px] h-[100px] bg-white rounded-lg flex items-center justify-center p-1.5 shrink-0">
+                <QRCodeSVG value={addr} size={88} level="H" bgColor="#ffffff" fgColor="#000000" />
               </div>
-              <label className="block text-[11px] text-gray-500 mb-2">Deposit Address</label>
-              <code className="block text-sm text-white font-mono break-all leading-relaxed mb-3">{addr}</code>
-              <CopyButton text={addr} id={m.id + '-addr'} label="Copy Address" />
+              <div className="flex-1 min-w-0">
+                <label className="block text-[11px] text-gray-500 mb-1.5">Deposit Address</label>
+                <code className="block text-xs text-white font-mono break-all leading-relaxed mb-2">{addr}</code>
+                <CopyButton text={addr} id={m.id + '-addr'} label="Copy Address" />
+              </div>
             </div>
           )}
 
@@ -372,6 +388,189 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     );
   };
 
+  // ── Step 1: Network & Token selection ──
+  const renderCryptoStep1 = () => (
+    <div className="space-y-5">
+      {/* Chain cards */}
+      <div>
+        <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Network</label>
+        <div className={cn("grid gap-2", chains.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
+          {chains.map(c => {
+            const isSelected = c.name === selectedChain;
+            return (
+              <button
+                key={c.name}
+                onClick={() => {
+                  setSelectedChain(c.name);
+                  const hasCurrentToken = c.tokens.some(t => t.symbol === selectedToken) || c.gasToken === selectedToken;
+                  if (!hasCurrentToken) {
+                    setSelectedToken(c.tokens.find(t => t.symbol === 'USDT')?.symbol || c.tokens[0]?.symbol || c.gasToken);
+                  }
+                }}
+                className={cn(
+                  "relative p-3 rounded-xl border-2 transition-all text-center",
+                  isSelected
+                    ? "border-brand-500/50 bg-brand-500/[0.06]"
+                    : "border-glass-border hover:border-brand-500/20 bg-surface-100"
+                )}
+              >
+                {isSelected && (
+                  <div className="absolute top-1.5 right-1.5">
+                    <Check className="w-3.5 h-3.5 text-brand-400" />
+                  </div>
+                )}
+                <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center mx-auto mb-1.5">
+                  <span className={cn("font-bold text-[11px]", isSelected ? "text-brand-400" : "text-gray-400")}>
+                    {c.gasToken}
+                  </span>
+                </div>
+                <div className={cn("text-xs font-medium", isSelected ? "text-white" : "text-gray-300")}>
+                  {c.displayName}
+                </div>
+                <div className="text-[10px] text-gray-500 mt-0.5">
+                  {(CHAIN_CONFIRMATIONS[c.name] || { time: '~2 min' }).time}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Token pills */}
+      {availableTokens.length > 0 && (
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Token</label>
+          <div className="flex gap-2 flex-wrap">
+            {availableTokens.map(t => (
+              <button
+                key={t.symbol}
+                onClick={() => setSelectedToken(t.symbol)}
+                className={cn(
+                  "px-3.5 py-2 text-xs rounded-xl border-2 transition-all font-medium",
+                  selectedToken === t.symbol
+                    ? "bg-brand-500/[0.06] text-brand-400 border-brand-500/50"
+                    : "text-gray-400 border-glass-border hover:text-gray-300 hover:border-brand-500/20 bg-surface-100"
+                )}
+              >
+                {t.symbol}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Warning */}
+      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5">
+        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+        <div className="text-xs text-amber-300 leading-relaxed">
+          <p className="font-medium">
+            Only send {selectedToken} on {currentChain?.displayName || selectedChain} network.
+          </p>
+          <p className="text-amber-300/70 mt-0.5">Wrong network = permanent loss of funds.</p>
+        </div>
+      </div>
+
+      {/* Continue button */}
+      <button
+        onClick={handleContinueToAddress}
+        disabled={!selectedChain || !selectedToken}
+        className="w-full flex items-center justify-center gap-2 h-11 text-sm font-semibold bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
+      >
+        Continue
+        <ArrowRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
+  // ── Step 2: Address & QR display ──
+  const renderCryptoStep2 = () => (
+    <div className="space-y-4">
+      {/* Back button */}
+      <button
+        onClick={handleBackToSelect}
+        className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
+      >
+        <ChevronLeft className="w-3.5 h-3.5" /> Change network / token
+      </button>
+
+      {/* Token + Chain badge */}
+      <div className="text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
+          <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
+          {selectedToken} — {currentChain?.displayName || selectedChain}
+        </div>
+      </div>
+
+      {walletLoading ? (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
+        </div>
+      ) : walletError ? (
+        <div className="text-center py-10">
+          <AlertTriangle className="w-8 h-8 text-yellow-400 mx-auto mb-3" />
+          <p className="text-sm text-gray-400">{walletError}</p>
+          <button
+            onClick={() => fetchAddress(selectedChain)}
+            className="mt-3 text-xs text-brand-400 hover:text-brand-300"
+          >
+            Try again
+          </button>
+        </div>
+      ) : walletAddress ? (
+        <>
+          {/* Horizontal QR + Address card */}
+          <div className="p-4 rounded-2xl bg-surface-100 border border-glass-border flex items-start gap-4">
+            <div className="w-[120px] h-[120px] bg-white rounded-xl flex items-center justify-center p-2 shrink-0">
+              <QRCodeSVG
+                value={walletAddress}
+                size={104}
+                level="H"
+                bgColor="#ffffff"
+                fgColor="#000000"
+              />
+            </div>
+            <div className="flex-1 min-w-0 py-1">
+              <label className="block text-[11px] text-gray-500 mb-2">Your Deposit Address</label>
+              <code className="block text-[13px] text-white font-mono break-all leading-relaxed mb-3">
+                {walletAddress}
+              </code>
+              <CopyButton text={walletAddress} id="personal-addr" label="Copy Address" />
+            </div>
+          </div>
+
+          {/* Info row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-2.5 rounded-xl bg-surface-100 border border-glass-border">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Clock className="w-3 h-3 text-gray-500" />
+                <span className="text-[10px] text-gray-500">Est. Time</span>
+              </div>
+              <p className="text-sm font-medium text-white">{chainConf.time}</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-surface-100 border border-glass-border">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Shield className="w-3 h-3 text-gray-500" />
+                <span className="text-[10px] text-gray-500">Confirmations</span>
+              </div>
+              <p className="text-sm font-medium text-white">{chainConf.blocks} blocks</p>
+            </div>
+          </div>
+
+          {/* Warning */}
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-300">
+              <p className="font-medium mb-0.5">
+                Only send {selectedToken} on {currentChain?.displayName || selectedChain} network to this address
+              </p>
+              <p className="text-amber-300/70">Sending tokens on wrong network may result in permanent loss of funds.</p>
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <div
@@ -447,7 +646,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                     return (
                       <button
                         key={t.id}
-                        onClick={() => { setActiveTab(t.id); setSelectedMethod(null); }}
+                        onClick={() => { setActiveTab(t.id); setSelectedMethod(null); setDepositStep('select'); }}
                         className={cn(
                           'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors whitespace-nowrap min-w-0',
                           activeTab === t.id ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
@@ -464,153 +663,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {activeTab === 'wallet' ? (
-                <div className="space-y-4">
-                  {/* Chain selector */}
-                  {chains.length > 0 && (
-                    <div className="relative">
-                      <button
-                        onClick={() => setChainDropdownOpen(!chainDropdownOpen)}
-                        className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-surface-100 border border-glass-border hover:border-brand-500/30 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center">
-                            <Wallet className="w-4 h-4 text-brand-400" />
-                          </div>
-                          <div className="text-left">
-                            <div className="text-sm font-medium text-white">
-                              {currentChain?.displayName || selectedChain}
-                            </div>
-                            <div className="text-[11px] text-gray-500">
-                              Gas: {currentChain?.gasToken || '—'}
-                            </div>
-                          </div>
-                        </div>
-                        <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform", chainDropdownOpen && "rotate-180")} />
-                      </button>
-
-                      {chainDropdownOpen && (
-                        <div className="absolute z-10 mt-1 w-full rounded-xl bg-surface-200 border border-glass-border shadow-xl overflow-hidden">
-                          {chains.map(c => (
-                            <button
-                              key={c.name}
-                              onClick={() => {
-                                setSelectedChain(c.name);
-                                setSelectedToken(c.tokens[0]?.symbol || c.gasToken);
-                                setChainDropdownOpen(false);
-                              }}
-                              className={cn(
-                                "w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.04] transition-colors",
-                                c.name === selectedChain && "bg-brand-500/5"
-                              )}
-                            >
-                              <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
-                                <span className="text-brand-400 font-bold text-[10px]">{c.gasToken}</span>
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium text-white">{c.displayName}</div>
-                                <div className="text-[11px] text-gray-500">
-                                  {c.tokens.map(t => t.symbol).join(', ')}
-                                </div>
-                              </div>
-                              {c.name === selectedChain && (
-                                <Check className="w-4 h-4 text-brand-400 ml-auto" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Token selector pills */}
-                  {availableTokens.length > 0 && (
-                    <div className="flex gap-2 flex-wrap">
-                      {availableTokens.map(t => (
-                        <button
-                          key={t.symbol}
-                          onClick={() => setSelectedToken(t.symbol)}
-                          className={cn(
-                            "px-3 py-1.5 text-xs rounded-lg border transition-colors font-medium",
-                            selectedToken === t.symbol
-                              ? "bg-brand-500/10 text-brand-400 border-brand-500/30"
-                              : "text-gray-400 border-glass-border hover:text-gray-300 hover:border-white/[0.12]"
-                          )}
-                        >
-                          {t.symbol}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {walletLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
-                    </div>
-                  ) : walletError ? (
-                    <div className="text-center py-12">
-                      <AlertTriangle className="w-8 h-8 text-yellow-400 mx-auto mb-3" />
-                      <p className="text-sm text-gray-400">{walletError}</p>
-                      <p className="text-xs text-gray-600 mt-1">Please try again later</p>
-                    </div>
-                  ) : walletAddress ? (
-                    <>
-                      <div className="text-center">
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium mb-3">
-                          <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
-                          {selectedToken} — {currentChain?.displayName || selectedChain}
-                        </div>
-                      </div>
-
-                      <div className="p-5 rounded-2xl bg-surface-100 border border-glass-border text-center">
-                        <div className="w-44 h-44 bg-white rounded-xl mx-auto mb-4 flex items-center justify-center p-2">
-                          <QRCodeSVG
-                            value={walletAddress}
-                            size={152}
-                            level="H"
-                            bgColor="#ffffff"
-                            fgColor="#000000"
-                          />
-                        </div>
-                        <label className="block text-[11px] text-gray-500 mb-2">Your Personal Deposit Address</label>
-                        <code className="block text-sm text-white font-mono break-all leading-relaxed mb-3">
-                          {walletAddress}
-                        </code>
-                        <CopyButton text={walletAddress} id="personal-addr" label="Copy Address" />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Clock className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-[11px] text-gray-500">Est. Time</span>
-                          </div>
-                          <p className="text-sm font-medium text-white">{chainConf.time}</p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Shield className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-[11px] text-gray-500">Confirmations</span>
-                          </div>
-                          <p className="text-sm font-medium text-white">{chainConf.blocks} blocks</p>
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                        <div className="text-xs text-amber-300">
-                          <p className="font-medium mb-0.5">
-                            Only send {selectedToken} on {currentChain?.displayName || selectedChain} network to this address
-                          </p>
-                          <p className="text-amber-300/70">Sending tokens on wrong network may result in permanent loss of funds.</p>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-sm text-gray-400">Please log in to see your deposit address</p>
-                    </div>
-                  )}
-                </div>
+                depositStep === 'select'
+                  ? renderCryptoStep1()
+                  : renderCryptoStep2()
               ) : loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
@@ -732,13 +787,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             </div>
           </>
         )}
-
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-glass-border shrink-0">
-          <p className="text-[11px] text-gray-600 text-center">
-            Deposits are credited after confirmation. Contact support for assistance.
-          </p>
-        </div>
       </div>
     </div>
   );
