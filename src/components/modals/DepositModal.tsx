@@ -31,6 +31,7 @@ const TYPE_ICONS: Record<string, React.ElementType> = {
 const CHAIN_CONFIRMATIONS: Record<string, { blocks: number; time: string }> = {
   bsc: { blocks: 15, time: '~1 min' },
   ethereum: { blocks: 12, time: '~3 min' },
+  tron: { blocks: 19, time: '~1 min' },
 };
 
 export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
