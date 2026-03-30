@@ -731,12 +731,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
+          <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Method</label>
           {filteredFiatMethods.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-sm text-gray-400">No methods available for {selectedFiatCurrency}</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className={cn("grid gap-3", filteredFiatMethods.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
               {filteredFiatMethods.map(m => {
                 const Icon = FIAT_TYPE_ICONS[m.type] || CreditCard;
                 const typeLabel = FIAT_TYPE_LABELS[m.type] || m.type;
@@ -745,21 +746,14 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                   <button
                     key={m.id}
                     onClick={() => setSelectedMethod(m)}
-                    className="w-full p-4 rounded-xl border border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/5 transition-colors text-left flex items-center justify-between"
+                    className="p-4 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
-                        <Icon className="w-4 h-4 text-brand-400" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-white">{m.name}</div>
-                        <div className="text-[11px] text-gray-500 flex items-center gap-1.5">
-                          <span>{typeLabel}</span>
-                          {bankName && <><span className="text-gray-600">·</span><span>{bankName}</span></>}
-                        </div>
-                      </div>
+                    <div className="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center mx-auto mb-2">
+                      <Icon className="w-5 h-5 text-brand-400" />
                     </div>
-                    <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />
+                    <div className="text-sm font-semibold text-white">{m.name}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">{typeLabel}</div>
+                    {bankName && <div className="text-[10px] text-gray-600 mt-0.5">{bankName}</div>}
                   </button>
                 );
               })}
