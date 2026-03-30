@@ -46,6 +46,15 @@ const FIAT_TYPE_ICONS: Record<string, React.ElementType> = {
   manual: CreditCard,
 };
 
+const CURRENCY_META: Record<string, { symbol: string; name: string; flag: string }> = {
+  TRY: { symbol: '₺', name: 'Turkish Lira', flag: '🇹🇷' },
+  USD: { symbol: '$', name: 'US Dollar', flag: '🇺🇸' },
+  EUR: { symbol: '€', name: 'Euro', flag: '🇪🇺' },
+  GBP: { symbol: '£', name: 'British Pound', flag: '🇬🇧' },
+  RUB: { symbol: '₽', name: 'Russian Ruble', flag: '🇷🇺' },
+  AED: { symbol: 'د.إ', name: 'UAE Dirham', flag: '🇦🇪' },
+};
+
 const CHAIN_CONFIRMATIONS: Record<string, { blocks: number; time: string }> = {
   bsc: { blocks: 15, time: '~1 min' },
   ethereum: { blocks: 12, time: '~3 min' },
@@ -75,6 +84,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     id: string; asset: string; amount: string; status: string; tx_hash: string | null; created_at: string | null;
   }>>([]);
 
+  const [selectedFiatCurrency, setSelectedFiatCurrency] = useState<string | null>(null);
+
   const [claimAmount, setClaimAmount] = useState('');
   const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [claimSuccess, setClaimSuccess] = useState(false);
@@ -98,6 +109,23 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     () => methods.filter(m => m.type !== 'crypto'),
     [methods],
   );
+
+  const fiatCurrencies = useMemo(() => {
+    const currencySet = new Set<string>();
+    for (const m of fiatMethods) {
+      const cur = (m.config?.currency as string) || m.currency || '';
+      if (cur) currencySet.add(cur.toUpperCase());
+    }
+    return Array.from(currencySet).sort();
+  }, [fiatMethods]);
+
+  const filteredFiatMethods = useMemo(() => {
+    if (!selectedFiatCurrency) return [];
+    return fiatMethods.filter(m => {
+      const cur = ((m.config?.currency as string) || m.currency || '').toUpperCase();
+      return cur === selectedFiatCurrency;
+    });
+  }, [fiatMethods, selectedFiatCurrency]);
 
   const hasFiatMethods = fiatMethods.length > 0;
 
@@ -139,6 +167,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       .finally(() => setLoading(false));
 
     setDepositStep('select');
+    setSelectedFiatCurrency(null);
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -581,7 +610,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     </div>
   );
 
-  // ── Fiat: method list ──
+  // ── Fiat: currency → method → detail flow ──
   const renderFiatContent = () => {
     if (loading) {
       return (
@@ -603,6 +632,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       );
     }
 
+    // Step 3: Method detail + claim form
     if (selectedMethod) {
       return (
         <div className="space-y-4">
@@ -610,7 +640,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             onClick={() => { setSelectedMethod(null); resetClaimForm(); }}
             className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
           >
-            <ChevronLeft className="w-3.5 h-3.5" /> Back to list
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to methods
           </button>
           <div className="text-center mb-2">
             <h3 className="text-base font-semibold text-white">{selectedMethod.name}</h3>
@@ -683,36 +713,89 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       );
     }
 
+    // Step 2: Method list for selected currency
+    if (selectedFiatCurrency) {
+      return (
+        <div className="space-y-4">
+          <button
+            onClick={() => setSelectedFiatCurrency(null)}
+            className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Change currency
+          </button>
+
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
+              <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
+              {selectedFiatCurrency} — {CURRENCY_META[selectedFiatCurrency]?.name || selectedFiatCurrency}
+            </div>
+          </div>
+
+          {filteredFiatMethods.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-400">No methods available for {selectedFiatCurrency}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredFiatMethods.map(m => {
+                const Icon = FIAT_TYPE_ICONS[m.type] || CreditCard;
+                const typeLabel = FIAT_TYPE_LABELS[m.type] || m.type;
+                const bankName = (m.config?.bank_name || m.config?.bankName || '') as string;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setSelectedMethod(m)}
+                    className="w-full p-4 rounded-xl border border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/5 transition-colors text-left flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-brand-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-white">{m.name}</div>
+                        <div className="text-[11px] text-gray-500 flex items-center gap-1.5">
+                          <span>{typeLabel}</span>
+                          {bankName && <><span className="text-gray-600">·</span><span>{bankName}</span></>}
+                        </div>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Step 1: Currency selection
     return (
-      <div className="space-y-2">
-        {fiatMethods.map(m => {
-          const Icon = FIAT_TYPE_ICONS[m.type] || CreditCard;
-          const typeLabel = FIAT_TYPE_LABELS[m.type] || m.type;
-          const bankName = (m.config?.bank_name || m.config?.bankName || '') as string;
-          const currency = (m.config?.currency || m.currency || '') as string;
-          return (
-            <button
-              key={m.id}
-              onClick={() => setSelectedMethod(m)}
-              className="w-full p-4 rounded-xl border border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/5 transition-colors text-left flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
-                  <Icon className="w-4.5 h-4.5 text-brand-400" />
+      <div className="space-y-5">
+        <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Currency</label>
+        <div className={cn("grid gap-3", fiatCurrencies.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
+          {fiatCurrencies.map(cur => {
+            const meta = CURRENCY_META[cur];
+            const methodCount = fiatMethods.filter(m => {
+              const c = ((m.config?.currency as string) || m.currency || '').toUpperCase();
+              return c === cur;
+            }).length;
+            return (
+              <button
+                key={cur}
+                onClick={() => setSelectedFiatCurrency(cur)}
+                className="p-4 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center"
+              >
+                <div className="text-2xl mb-1.5">{meta?.flag || '💱'}</div>
+                <div className="text-sm font-semibold text-white">{cur}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">{meta?.name || cur}</div>
+                <div className="text-[10px] text-gray-600 mt-1">
+                  {methodCount} {methodCount === 1 ? 'method' : 'methods'}
                 </div>
-                <div>
-                  <div className="text-sm font-medium text-white">{m.name}</div>
-                  <div className="text-[11px] text-gray-500 flex items-center gap-1.5">
-                    <span>{typeLabel}</span>
-                    {bankName && <><span className="text-gray-600">·</span><span>{bankName}</span></>}
-                    {currency && <><span className="text-gray-600">·</span><span>{currency}</span></>}
-                  </div>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -794,7 +877,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                   </button>
                 )}
                 <button
-                  onClick={() => { setActiveTab('fiat'); setSelectedMethod(null); }}
+                  onClick={() => { setActiveTab('fiat'); setSelectedMethod(null); setSelectedFiatCurrency(null); }}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors',
                     activeTab === 'fiat' ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
