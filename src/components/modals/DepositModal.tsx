@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2 } from 'lucide-react';
+import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, ChevronDown, Send, CheckCircle2, Banknote } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
 import { depositApi, type PaymentMethod, type ChainInfo } from '@/lib/api';
@@ -12,16 +12,31 @@ interface DepositModalProps {
   onClose: () => void;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  crypto: 'Crypto',
+const CHAIN_BRAND: Record<string, { color: string; bg: string; border: string }> = {
+  bsc:      { color: '#F3BA2F', bg: 'rgba(243,186,47,0.12)', border: 'rgba(243,186,47,0.3)' },
+  ethereum: { color: '#627EEA', bg: 'rgba(98,126,234,0.12)', border: 'rgba(98,126,234,0.3)' },
+  tron:     { color: '#FF0013', bg: 'rgba(255,0,19,0.12)',    border: 'rgba(255,0,19,0.3)' },
+};
+
+const TOKEN_BRAND: Record<string, { color: string; bg: string }> = {
+  BNB:  { color: '#F3BA2F', bg: 'rgba(243,186,47,0.15)' },
+  ETH:  { color: '#627EEA', bg: 'rgba(98,126,234,0.15)' },
+  TRX:  { color: '#FF0013', bg: 'rgba(255,0,19,0.15)' },
+  USDT: { color: '#26A17B', bg: 'rgba(38,161,123,0.15)' },
+  USDC: { color: '#2775CA', bg: 'rgba(39,117,202,0.15)' },
+  DAI:  { color: '#F5AC37', bg: 'rgba(245,172,55,0.15)' },
+  BTCB: { color: '#F7931A', bg: 'rgba(247,147,26,0.15)' },
+  WETH: { color: '#627EEA', bg: 'rgba(98,126,234,0.15)' },
+};
+
+const FIAT_TYPE_LABELS: Record<string, string> = {
   bank_transfer: 'Bank Transfer',
   papara: 'Papara',
   external_api: 'External',
   manual: 'Manual',
 };
 
-const TYPE_ICONS: Record<string, React.ElementType> = {
-  crypto: Wallet,
+const FIAT_TYPE_ICONS: Record<string, React.ElementType> = {
   bank_transfer: Building2,
   papara: CreditCard,
   external_api: CreditCard,
@@ -37,33 +52,26 @@ const CHAIN_CONFIRMATIONS: Record<string, { blocks: number; time: string }> = {
 export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuthStore();
 
-  // Chain & token state
   const [chains, setChains] = useState<ChainInfo[]>([]);
   const [selectedChain, setSelectedChain] = useState<string>('bsc');
   const [selectedToken, setSelectedToken] = useState<string>('USDT');
-
-  // Step-based flow for crypto deposit
   const [depositStep, setDepositStep] = useState<'select' | 'address'>('select');
 
-  // Wallet address
   const [walletAddress, setWalletAddress] = useState('');
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState('');
 
-  // Payment methods
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('wallet');
+  const [activeTab, setActiveTab] = useState<'crypto' | 'fiat'>('crypto');
   const [copiedId, setCopiedId] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
 
-  // History
   const [showHistory, setShowHistory] = useState(false);
   const [deposits, setDeposits] = useState<Array<{
     id: string; asset: string; amount: string; status: string; tx_hash: string | null; created_at: string | null;
   }>>([]);
 
-  // Claim state
   const [claimAmount, setClaimAmount] = useState('');
   const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [claimSuccess, setClaimSuccess] = useState(false);
@@ -83,25 +91,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     ];
   }, [currentChain]);
 
-  const methodTypes = useMemo(() => {
-    const types = new Set(methods.map(m => m.type));
-    return Array.from(types);
-  }, [methods]);
+  const fiatMethods = useMemo(
+    () => methods.filter(m => m.type !== 'crypto'),
+    [methods],
+  );
 
-  const tabs = useMemo(() => {
-    const t: { id: string; label: string; icon: React.ElementType }[] = [];
-    if (user) {
-      t.push({ id: 'wallet', label: 'Crypto', icon: Wallet });
-    }
-    for (const type of methodTypes) {
-      t.push({
-        id: type,
-        label: TYPE_LABELS[type] || type,
-        icon: TYPE_ICONS[type] || CreditCard,
-      });
-    }
-    return t;
-  }, [user, methodTypes]);
+  const hasFiatMethods = fiatMethods.length > 0;
 
   const fetchAddress = useCallback(async (chain: string) => {
     if (!user) return;
@@ -143,9 +138,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     setDepositStep('select');
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch address only when entering Step 2
   useEffect(() => {
-    if (!isOpen || !user || activeTab !== 'wallet' || depositStep !== 'address') return;
+    if (!isOpen || !user || activeTab !== 'crypto' || depositStep !== 'address') return;
     fetchAddress(selectedChain);
   }, [isOpen, user, activeTab, depositStep, selectedChain, fetchAddress]);
 
@@ -158,14 +152,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
   useEffect(() => {
     if (!isOpen) return;
-    if (!user && activeTab === 'wallet') {
-      setActiveTab(methodTypes[0] || 'wallet');
+    if (!user && activeTab === 'crypto') {
+      if (hasFiatMethods) setActiveTab('fiat');
     }
-  }, [isOpen, user, activeTab, methodTypes]);
+  }, [isOpen, user, activeTab, hasFiatMethods]);
 
   if (!isOpen) return null;
 
-  const filteredMethods = methods.filter(m => m.type === activeTab);
   const chainConf = CHAIN_CONFIRMATIONS[selectedChain] || { blocks: 15, time: '~2 min' };
 
   const resetClaimForm = () => {
@@ -232,6 +225,23 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     return 'text-red-400';
   };
 
+  const TokenIcon = ({ symbol, size = 20 }: { symbol: string; size?: number }) => {
+    const brand = TOKEN_BRAND[symbol];
+    const color = brand?.color || '#9CA3AF';
+    const bg = brand?.bg || 'rgba(156,163,175,0.15)';
+    return (
+      <div
+        className="rounded-full flex items-center justify-center shrink-0"
+        style={{ width: size, height: size, backgroundColor: bg }}
+      >
+        <span className="font-bold" style={{ color, fontSize: size * 0.4 }}>
+          {symbol.charAt(0)}
+        </span>
+      </div>
+    );
+  };
+
+  // ── Fiat: method detail renderer ──
   const renderMethodDetail = (m: PaymentMethod) => {
     const config = m.config || {};
 
@@ -391,12 +401,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   // ── Step 1: Network & Token selection ──
   const renderCryptoStep1 = () => (
     <div className="space-y-5">
-      {/* Chain cards */}
       <div>
         <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Network</label>
         <div className={cn("grid gap-2", chains.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
           {chains.map(c => {
             const isSelected = c.name === selectedChain;
+            const brand = CHAIN_BRAND[c.name];
             return (
               <button
                 key={c.name}
@@ -419,8 +429,11 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                     <Check className="w-3.5 h-3.5 text-brand-400" />
                   </div>
                 )}
-                <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center mx-auto mb-1.5">
-                  <span className={cn("font-bold text-[11px]", isSelected ? "text-brand-400" : "text-gray-400")}>
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center mx-auto mb-1.5"
+                  style={{ backgroundColor: brand?.bg || 'rgba(156,163,175,0.12)' }}
+                >
+                  <span className="font-bold text-[11px]" style={{ color: brand?.color || '#9CA3AF' }}>
                     {c.gasToken}
                   </span>
                 </div>
@@ -436,30 +449,32 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         </div>
       </div>
 
-      {/* Token pills */}
       {availableTokens.length > 0 && (
         <div>
           <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Token</label>
           <div className="flex gap-2 flex-wrap">
-            {availableTokens.map(t => (
-              <button
-                key={t.symbol}
-                onClick={() => setSelectedToken(t.symbol)}
-                className={cn(
-                  "px-3.5 py-2 text-xs rounded-xl border-2 transition-all font-medium",
-                  selectedToken === t.symbol
-                    ? "bg-brand-500/[0.06] text-brand-400 border-brand-500/50"
-                    : "text-gray-400 border-glass-border hover:text-gray-300 hover:border-brand-500/20 bg-surface-100"
-                )}
-              >
-                {t.symbol}
-              </button>
-            ))}
+            {availableTokens.map(t => {
+              const isSelected = selectedToken === t.symbol;
+              return (
+                <button
+                  key={t.symbol}
+                  onClick={() => setSelectedToken(t.symbol)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 text-xs rounded-xl border-2 transition-all font-medium",
+                    isSelected
+                      ? "bg-brand-500/[0.06] text-brand-400 border-brand-500/50"
+                      : "text-gray-400 border-glass-border hover:text-gray-300 hover:border-brand-500/20 bg-surface-100"
+                  )}
+                >
+                  <TokenIcon symbol={t.symbol} size={18} />
+                  {t.symbol}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Warning */}
       <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5">
         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
         <div className="text-xs text-amber-300 leading-relaxed">
@@ -470,7 +485,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         </div>
       </div>
 
-      {/* Continue button */}
       <button
         onClick={handleContinueToAddress}
         disabled={!selectedChain || !selectedToken}
@@ -485,7 +499,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   // ── Step 2: Address & QR display ──
   const renderCryptoStep2 = () => (
     <div className="space-y-4">
-      {/* Back button */}
       <button
         onClick={handleBackToSelect}
         className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
@@ -493,10 +506,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         <ChevronLeft className="w-3.5 h-3.5" /> Change network / token
       </button>
 
-      {/* Token + Chain badge */}
       <div className="text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
-          <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
+          <TokenIcon symbol={selectedToken} size={16} />
           {selectedToken} — {currentChain?.displayName || selectedChain}
         </div>
       </div>
@@ -518,16 +530,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         </div>
       ) : walletAddress ? (
         <>
-          {/* Horizontal QR + Address card */}
           <div className="p-4 rounded-2xl bg-surface-100 border border-glass-border flex items-start gap-4">
             <div className="w-[120px] h-[120px] bg-white rounded-xl flex items-center justify-center p-2 shrink-0">
-              <QRCodeSVG
-                value={walletAddress}
-                size={104}
-                level="H"
-                bgColor="#ffffff"
-                fgColor="#000000"
-              />
+              <QRCodeSVG value={walletAddress} size={104} level="H" bgColor="#ffffff" fgColor="#000000" />
             </div>
             <div className="flex-1 min-w-0 py-1">
               <label className="block text-[11px] text-gray-500 mb-2">Your Deposit Address</label>
@@ -538,7 +543,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          {/* Info row */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-2.5 rounded-xl bg-surface-100 border border-glass-border">
               <div className="flex items-center gap-1.5 mb-0.5">
@@ -556,7 +560,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          {/* Warning */}
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div className="text-xs text-amber-300">
@@ -571,6 +574,142 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     </div>
   );
 
+  // ── Fiat: method list ──
+  const renderFiatContent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
+        </div>
+      );
+    }
+
+    if (fiatMethods.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <div className="w-12 h-12 rounded-xl bg-surface-100 flex items-center justify-center mx-auto mb-3">
+            <Banknote className="w-6 h-6 text-gray-500" />
+          </div>
+          <p className="text-sm text-gray-400">No fiat deposit methods available</p>
+          <p className="text-xs text-gray-600 mt-1">Contact support for deposit instructions</p>
+        </div>
+      );
+    }
+
+    if (selectedMethod) {
+      return (
+        <div className="space-y-4">
+          <button
+            onClick={() => { setSelectedMethod(null); resetClaimForm(); }}
+            className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to list
+          </button>
+          <div className="text-center mb-2">
+            <h3 className="text-base font-semibold text-white">{selectedMethod.name}</h3>
+            {selectedMethod.currency && (
+              <span className="inline-block mt-1 px-2 py-0.5 text-[10px] bg-brand-500/10 text-brand-400 rounded-full">
+                {selectedMethod.currency}
+              </span>
+            )}
+          </div>
+          {renderMethodDetail(selectedMethod)}
+
+          {user && (
+            claimSuccess ? (
+              <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                <p className="text-sm font-medium text-green-400 mb-1">Deposit Claim Submitted</p>
+                <p className="text-xs text-green-300/70">
+                  Your deposit of {claimAmount} {selectedMethod.currency || 'USDT'} is pending admin verification.
+                  You will be credited once confirmed.
+                </p>
+                <button
+                  onClick={resetClaimForm}
+                  className="mt-3 px-4 py-1.5 text-xs text-brand-400 hover:text-brand-300 border border-brand-500/30 rounded-lg transition-colors"
+                >
+                  Submit Another
+                </button>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-surface-100 border border-glass-border space-y-3">
+                <p className="text-xs text-gray-400 font-medium">After sending your payment:</p>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-1.5">Amount Sent</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={claimAmount}
+                      onChange={e => setClaimAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="flex-1 h-10 px-3 text-sm bg-white/[0.03] border border-white/[0.08] rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/40 focus:ring-1 focus:ring-brand-500/20"
+                    />
+                    <span className="flex items-center px-3 h-10 text-xs text-gray-400 bg-white/[0.03] border border-white/[0.08] rounded-lg">
+                      {selectedMethod.currency || 'USDT'}
+                    </span>
+                  </div>
+                </div>
+                {claimError && (
+                  <p className="text-xs text-red-400">{claimError}</p>
+                )}
+                <button
+                  onClick={() => handleClaimDeposit(selectedMethod)}
+                  disabled={claimSubmitting || !claimAmount}
+                  className="w-full flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                >
+                  {claimSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {claimSubmitting ? 'Submitting...' : "I've Sent the Payment"}
+                </button>
+                <p className="text-[10px] text-gray-600 text-center">
+                  Only click after you have completed the transfer. False claims may result in account restriction.
+                </p>
+              </div>
+            )
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {fiatMethods.map(m => {
+          const Icon = FIAT_TYPE_ICONS[m.type] || CreditCard;
+          const typeLabel = FIAT_TYPE_LABELS[m.type] || m.type;
+          const bankName = (m.config?.bank_name || m.config?.bankName || '') as string;
+          const currency = (m.config?.currency || m.currency || '') as string;
+          return (
+            <button
+              key={m.id}
+              onClick={() => setSelectedMethod(m)}
+              className="w-full p-4 rounded-xl border border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/5 transition-colors text-left flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
+                  <Icon className="w-4.5 h-4.5 text-brand-400" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-white">{m.name}</div>
+                  <div className="text-[11px] text-gray-500 flex items-center gap-1.5">
+                    <span>{typeLabel}</span>
+                    {bankName && <><span className="text-gray-600">·</span><span>{bankName}</span></>}
+                    {currency && <><span className="text-gray-600">·</span><span>{currency}</span></>}
+                  </div>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <div
@@ -580,7 +719,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         {/* Header */}
         <div className="px-6 py-4 border-b border-glass-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-display font-bold text-white">Deposit</h2>
+            <h2 className="text-lg font-display font-bold text-white">Pay4Pro Deposit</h2>
             {user && (
               <button
                 onClick={() => setShowHistory(!showHistory)}
@@ -633,156 +772,40 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
           </div>
         ) : (
           <>
-            {/* Tab selector */}
+            {/* Two-tab selector: Crypto | Fiat */}
             <div className="px-6 pt-4 shrink-0">
-              {loading && tabs.length <= 1 ? (
-                <div className="flex items-center justify-center py-2">
-                  <Loader2 className="w-4 h-4 text-brand-400 animate-spin" />
-                </div>
-              ) : (
-                <div className="flex gap-1 p-1 bg-surface-100 rounded-xl overflow-x-auto">
-                  {tabs.map(t => {
-                    const Icon = t.icon;
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => { setActiveTab(t.id); setSelectedMethod(null); setDepositStep('select'); }}
-                        className={cn(
-                          'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors whitespace-nowrap min-w-0',
-                          activeTab === t.id ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
-                        )}
-                      >
-                        <Icon className="w-4 h-4 shrink-0" /> {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="flex gap-1 p-1 bg-surface-100 rounded-xl">
+                {user && (
+                  <button
+                    onClick={() => { setActiveTab('crypto'); setSelectedMethod(null); setDepositStep('select'); }}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors',
+                      activeTab === 'crypto' ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
+                    )}
+                  >
+                    <Wallet className="w-4 h-4 shrink-0" /> Crypto
+                  </button>
+                )}
+                <button
+                  onClick={() => { setActiveTab('fiat'); setSelectedMethod(null); }}
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors',
+                    activeTab === 'fiat' ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
+                  )}
+                >
+                  <Banknote className="w-4 h-4 shrink-0" /> Fiat
+                </button>
+              </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {activeTab === 'wallet' ? (
+              {activeTab === 'crypto' ? (
                 depositStep === 'select'
                   ? renderCryptoStep1()
                   : renderCryptoStep2()
-              ) : loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
-                </div>
-              ) : filteredMethods.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-12 h-12 rounded-xl bg-surface-100 flex items-center justify-center mx-auto mb-3">
-                    <CreditCard className="w-6 h-6 text-gray-500" />
-                  </div>
-                  <p className="text-sm text-gray-400">No {TYPE_LABELS[activeTab] || activeTab} methods available</p>
-                  <p className="text-xs text-gray-600 mt-1">Contact support for deposit instructions</p>
-                </div>
-              ) : !selectedMethod ? (
-                <div className="space-y-2">
-                  {filteredMethods.map(m => {
-                    const coin = (m.config?.coin || m.config?.currency || m.currency || '') as string;
-                    const network = (m.config?.network || '') as string;
-                    const bankName = (m.config?.bank_name || m.config?.bankName || '') as string;
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => setSelectedMethod(m)}
-                        className="w-full p-4 rounded-xl border border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/5 transition-colors text-left flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
-                            <span className="text-brand-400 font-bold text-xs">
-                              {coin ? coin.slice(0, 4) : m.currency ? m.currency.slice(0, 4) : '?'}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-white">{m.name}</div>
-                            {network && <div className="text-xs text-gray-500">{network}</div>}
-                            {bankName && <div className="text-xs text-gray-500">{bankName}</div>}
-                          </div>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-gray-600" />
-                      </button>
-                    );
-                  })}
-                </div>
               ) : (
-                <div className="space-y-4">
-                  <button
-                    onClick={() => { setSelectedMethod(null); resetClaimForm(); }}
-                    className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" /> Back to list
-                  </button>
-                  <div className="text-center mb-2">
-                    <h3 className="text-base font-semibold text-white">{selectedMethod.name}</h3>
-                    {selectedMethod.currency && (
-                      <span className="inline-block mt-1 px-2 py-0.5 text-[10px] bg-brand-500/10 text-brand-400 rounded-full">
-                        {selectedMethod.currency}
-                      </span>
-                    )}
-                  </div>
-                  {renderMethodDetail(selectedMethod)}
-
-                  {selectedMethod.type !== 'crypto' && user && (
-                    claimSuccess ? (
-                      <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
-                        <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                        <p className="text-sm font-medium text-green-400 mb-1">Deposit Claim Submitted</p>
-                        <p className="text-xs text-green-300/70">
-                          Your deposit of {claimAmount} {selectedMethod.currency || 'USDT'} is pending admin verification.
-                          You will be credited once confirmed.
-                        </p>
-                        <button
-                          onClick={resetClaimForm}
-                          className="mt-3 px-4 py-1.5 text-xs text-brand-400 hover:text-brand-300 border border-brand-500/30 rounded-lg transition-colors"
-                        >
-                          Submit Another
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl bg-surface-100 border border-glass-border space-y-3">
-                        <p className="text-xs text-gray-400 font-medium">After sending your payment:</p>
-                        <div>
-                          <label className="block text-[11px] text-gray-500 mb-1.5">Amount Sent</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
-                              value={claimAmount}
-                              onChange={e => setClaimAmount(e.target.value)}
-                              placeholder="0.00"
-                              className="flex-1 h-10 px-3 text-sm bg-white/[0.03] border border-white/[0.08] rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/40 focus:ring-1 focus:ring-brand-500/20"
-                            />
-                            <span className="flex items-center px-3 h-10 text-xs text-gray-400 bg-white/[0.03] border border-white/[0.08] rounded-lg">
-                              {selectedMethod.currency || 'USDT'}
-                            </span>
-                          </div>
-                        </div>
-                        {claimError && (
-                          <p className="text-xs text-red-400">{claimError}</p>
-                        )}
-                        <button
-                          onClick={() => handleClaimDeposit(selectedMethod)}
-                          disabled={claimSubmitting || !claimAmount}
-                          className="w-full flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                        >
-                          {claimSubmitting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4" />
-                          )}
-                          {claimSubmitting ? 'Submitting...' : "I've Sent the Payment"}
-                        </button>
-                        <p className="text-[10px] text-gray-600 text-center">
-                          Only click after you have completed the transfer. False claims may result in account restriction.
-                        </p>
-                      </div>
-                    )
-                  )}
-                </div>
+                renderFiatContent()
               )}
             </div>
           </>
