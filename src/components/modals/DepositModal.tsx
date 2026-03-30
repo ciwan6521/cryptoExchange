@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, ChevronDown, Send, CheckCircle2, Banknote } from 'lucide-react';
+import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2, Banknote } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
 import { depositApi, type PaymentMethod, type ChainInfo } from '@/lib/api';
@@ -12,21 +12,24 @@ interface DepositModalProps {
   onClose: () => void;
 }
 
-const CHAIN_BRAND: Record<string, { color: string; bg: string; border: string }> = {
-  bsc:      { color: '#F3BA2F', bg: 'rgba(243,186,47,0.12)', border: 'rgba(243,186,47,0.3)' },
-  ethereum: { color: '#627EEA', bg: 'rgba(98,126,234,0.12)', border: 'rgba(98,126,234,0.3)' },
-  tron:     { color: '#FF0013', bg: 'rgba(255,0,19,0.12)',    border: 'rgba(255,0,19,0.3)' },
+const ICON_CDN = 'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color';
+
+const CHAIN_LOGO: Record<string, string> = {
+  bsc:      `${ICON_CDN}/bnb.svg`,
+  ethereum: `${ICON_CDN}/eth.svg`,
+  tron:     `${ICON_CDN}/trx.svg`,
 };
 
-const TOKEN_BRAND: Record<string, { color: string; bg: string }> = {
-  BNB:  { color: '#F3BA2F', bg: 'rgba(243,186,47,0.15)' },
-  ETH:  { color: '#627EEA', bg: 'rgba(98,126,234,0.15)' },
-  TRX:  { color: '#FF0013', bg: 'rgba(255,0,19,0.15)' },
-  USDT: { color: '#26A17B', bg: 'rgba(38,161,123,0.15)' },
-  USDC: { color: '#2775CA', bg: 'rgba(39,117,202,0.15)' },
-  DAI:  { color: '#F5AC37', bg: 'rgba(245,172,55,0.15)' },
-  BTCB: { color: '#F7931A', bg: 'rgba(247,147,26,0.15)' },
-  WETH: { color: '#627EEA', bg: 'rgba(98,126,234,0.15)' },
+const TOKEN_LOGO: Record<string, string> = {
+  BNB:  `${ICON_CDN}/bnb.svg`,
+  ETH:  `${ICON_CDN}/eth.svg`,
+  TRX:  `${ICON_CDN}/trx.svg`,
+  USDT: `${ICON_CDN}/usdt.svg`,
+  USDC: `${ICON_CDN}/usdc.svg`,
+  DAI:  `${ICON_CDN}/dai.svg`,
+  BTCB: `${ICON_CDN}/btc.svg`,
+  WETH: `${ICON_CDN}/eth.svg`,
+  BTC:  `${ICON_CDN}/btc.svg`,
 };
 
 const FIAT_TYPE_LABELS: Record<string, string> = {
@@ -225,17 +228,27 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     return 'text-red-400';
   };
 
-  const TokenIcon = ({ symbol, size = 20 }: { symbol: string; size?: number }) => {
-    const brand = TOKEN_BRAND[symbol];
-    const color = brand?.color || '#9CA3AF';
-    const bg = brand?.bg || 'rgba(156,163,175,0.15)';
+  const CryptoIcon = ({ symbol, chain, size = 20 }: { symbol?: string; chain?: string; size?: number }) => {
+    const src = symbol ? TOKEN_LOGO[symbol] : chain ? CHAIN_LOGO[chain] : undefined;
+    if (src) {
+      return (
+        <img
+          src={src}
+          alt={symbol || chain || ''}
+          width={size}
+          height={size}
+          className="rounded-full shrink-0"
+          style={{ width: size, height: size }}
+        />
+      );
+    }
     return (
       <div
-        className="rounded-full flex items-center justify-center shrink-0"
-        style={{ width: size, height: size, backgroundColor: bg }}
+        className="rounded-full flex items-center justify-center shrink-0 bg-white/10"
+        style={{ width: size, height: size }}
       >
-        <span className="font-bold" style={{ color, fontSize: size * 0.4 }}>
-          {symbol.charAt(0)}
+        <span className="font-bold text-gray-400" style={{ fontSize: size * 0.4 }}>
+          {(symbol || chain || '?').charAt(0)}
         </span>
       </div>
     );
@@ -406,7 +419,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         <div className={cn("grid gap-2", chains.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
           {chains.map(c => {
             const isSelected = c.name === selectedChain;
-            const brand = CHAIN_BRAND[c.name];
             return (
               <button
                 key={c.name}
@@ -429,13 +441,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                     <Check className="w-3.5 h-3.5 text-brand-400" />
                   </div>
                 )}
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center mx-auto mb-1.5"
-                  style={{ backgroundColor: brand?.bg || 'rgba(156,163,175,0.12)' }}
-                >
-                  <span className="font-bold text-[11px]" style={{ color: brand?.color || '#9CA3AF' }}>
-                    {c.gasToken}
-                  </span>
+                <div className="flex items-center justify-center mx-auto mb-1.5">
+                  <CryptoIcon chain={c.name} size={36} />
                 </div>
                 <div className={cn("text-xs font-medium", isSelected ? "text-white" : "text-gray-300")}>
                   {c.displayName}
@@ -466,7 +473,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                       : "text-gray-400 border-glass-border hover:text-gray-300 hover:border-brand-500/20 bg-surface-100"
                   )}
                 >
-                  <TokenIcon symbol={t.symbol} size={18} />
+                  <CryptoIcon symbol={t.symbol} size={18} />
                   {t.symbol}
                 </button>
               );
@@ -508,7 +515,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
       <div className="text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
-          <TokenIcon symbol={selectedToken} size={16} />
+          <CryptoIcon symbol={selectedToken} size={16} />
           {selectedToken} — {currentChain?.displayName || selectedChain}
         </div>
       </div>
