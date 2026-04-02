@@ -334,6 +334,25 @@ class Pay4ProClient:
             return data
         return data.get("data", data.get("methods", []))
 
+    async def get_payment_method_rate(
+        self,
+        payment_method_id: str,
+        amount: Optional[float] = None,
+    ) -> dict:
+        """
+        GET /api/payment-methods/:id/rate?amount=X
+
+        Returns exchange rate info (and optional conversion) for a payment method.
+        """
+        params: dict = {}
+        if amount is not None:
+            params["amount"] = amount
+        return await self._request(
+            "GET",
+            f"/api/payment-methods/{payment_method_id}/rate",
+            params=params if params else None,
+        )
+
     # ── Transaction Status ──
 
     async def get_transaction(self, tx_ref: str) -> dict:

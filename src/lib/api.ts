@@ -553,6 +553,18 @@ export interface PaymentMethod {
   is_active?: boolean;
 }
 
+export interface MethodRateInfo {
+  payment_method_id: string;
+  payment_method_name: string;
+  currency: string;
+  target_currency: string;
+  base_rate: number;
+  markup_percent: number;
+  effective_rate: number;
+  amount?: number;
+  converted_amount?: number;
+}
+
 export const depositApi = {
   getChains: () =>
     request<{ chains: ChainInfo[] }>('/api/deposits/chains'),
@@ -581,6 +593,13 @@ export const depositApi = {
       '/api/deposits/claim',
       { method: 'POST', body: JSON.stringify(data) },
     ),
+
+  getMethodRate: (paymentMethodId: string, amount?: number) => {
+    const qs = amount != null ? `?amount=${amount}` : '';
+    return request<MethodRateInfo>(
+      `/api/market/payment-method-rate/${encodeURIComponent(paymentMethodId)}${qs}`,
+    );
+  },
 };
 
 // ============================================

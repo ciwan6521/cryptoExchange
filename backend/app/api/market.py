@@ -130,3 +130,18 @@ async def get_deposit_methods():
     except Exception as exc:
         _log.warning("Failed to fetch payment methods from Pay4Pro: %s", exc)
         return {"methods": []}
+
+
+@router.get("/payment-method-rate/{payment_method_id}")
+async def get_payment_method_rate(
+    payment_method_id: str,
+    amount: float | None = Query(None, gt=0, description="Amount to convert"),
+):
+    """Proxy Pay4Pro rate endpoint — returns exchange rate + optional conversion."""
+    from app.services.pay4pro_client import Pay4ProClient, Pay4ProError
+    client = Pay4ProClient()
+    try:
+        data = await client.get_payment_method_rate(payment_method_id, amount=amount)
+        return data
+    except Pay4ProError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=exc.message)

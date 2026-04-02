@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2, Banknote } from 'lucide-react';
+import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2, Banknote, TrendingUp, Info } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
-import { depositApi, type PaymentMethod, type ChainInfo } from '@/lib/api';
+import { depositApi, type PaymentMethod, type ChainInfo, type MethodRateInfo } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 
 interface DepositModalProps {
@@ -90,6 +90,10 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [claimSuccess, setClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState('');
+
+  const [rateInfo, setRateInfo] = useState<MethodRateInfo | null>(null);
+  const [rateLoading, setRateLoading] = useState(false);
+  const rateTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentChain = useMemo(
     () => chains.find(c => c.name === selectedChain),
@@ -189,6 +193,53 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     }
   }, [isOpen, user, activeTab, hasFiatMethods]);
 
+  // Fetch base rate when a fiat method is selected (skip USDT methods)
+  useEffect(() => {
+    if (!selectedMethod) { setRateInfo(null); return; }
+    const cur = (selectedMethod.config?.currency as string || selectedMethod.currency || '').toUpperCase();
+    if (cur === 'USDT' || cur === '') { setRateInfo(null); return; }
+
+    let cancelled = false;
+    setRateLoading(true);
+    depositApi.getMethodRate(selectedMethod.id)
+      .then(data => { if (!cancelled) setRateInfo(data); })
+      .catch(() => { if (!cancelled) setRateInfo(null); })
+      .finally(() => { if (!cancelled) setRateLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedMethod]);
+
+  // Debounced rate fetch with amount conversion
+  useEffect(() => {
+    if (rateTimerRef.current) clearTimeout(rateTimerRef.current);
+    if (!selectedMethod) return;
+    const cur = (selectedMethod.config?.currency as string || selectedMethod.currency || '').toUpperCase();
+    if (cur === 'USDT' || cur === '') return;
+
+    const numAmount = parseFloat(claimAmount);
+    if (!claimAmount || isNaN(numAmount) || numAmount <= 0) {
+      // Refetch without amount to clear converted_amount
+      let cancelled = false;
+      setRateLoading(true);
+      depositApi.getMethodRate(selectedMethod.id)
+        .then(data => { if (!cancelled) setRateInfo(data); })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setRateLoading(false); });
+      return () => { cancelled = true; };
+    }
+
+    rateTimerRef.current = setTimeout(() => {
+      let cancelled = false;
+      setRateLoading(true);
+      depositApi.getMethodRate(selectedMethod.id, numAmount)
+        .then(data => { if (!cancelled) setRateInfo(data); })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setRateLoading(false); });
+      return () => { cancelled = true; };
+    }, 400);
+
+    return () => { if (rateTimerRef.current) clearTimeout(rateTimerRef.current); };
+  }, [claimAmount, selectedMethod]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!isOpen) return null;
 
   const chainConf = CHAIN_CONFIRMATIONS[selectedChain] || { blocks: 15, time: '~2 min' };
@@ -198,6 +249,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     setClaimSubmitting(false);
     setClaimSuccess(false);
     setClaimError('');
+    setRateInfo(null);
   };
 
   const handleContinueToAddress = () => {
@@ -688,6 +740,51 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                     </span>
                   </div>
                 </div>
+
+                {/* Rate info panel */}
+                {(() => {
+                  const methodCur = (selectedMethod.config?.currency as string || selectedMethod.currency || '').toUpperCase();
+                  if (methodCur === 'USDT' || methodCur === '') return null;
+                  return (
+                    <div className="p-3 rounded-xl bg-brand-500/[0.04] border border-brand-500/10 space-y-2">
+                      {rateLoading ? (
+                        <div className="flex items-center justify-center gap-2 py-1">
+                          <Loader2 className="w-3.5 h-3.5 text-brand-400 animate-spin" />
+                          <span className="text-xs text-gray-400">Updating rate...</span>
+                        </div>
+                      ) : rateInfo ? (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <TrendingUp className="w-3.5 h-3.5 text-brand-400" />
+                              <span className="text-[11px] text-gray-400">Current Rate</span>
+                            </div>
+                            <span className="text-xs font-semibold text-white">
+                              1 {rateInfo.target_currency} = {rateInfo.effective_rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} {rateInfo.currency}
+                            </span>
+                          </div>
+                          {rateInfo.converted_amount != null && (
+                            <div className="flex items-center justify-between pt-1 border-t border-white/[0.04]">
+                              <span className="text-[11px] text-gray-400">You will receive</span>
+                              <span className="text-sm font-bold text-brand-400">
+                                ~{rateInfo.converted_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {rateInfo.target_currency}
+                              </span>
+                            </div>
+                          )}
+                          {rateInfo.markup_percent > 0 && (
+                            <div className="flex items-center gap-1 pt-1">
+                              <Info className="w-3 h-3 text-gray-600" />
+                              <span className="text-[10px] text-gray-600">
+                                Rate spread: %{rateInfo.markup_percent}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+
                 {claimError && (
                   <p className="text-xs text-red-400">{claimError}</p>
                 )}
