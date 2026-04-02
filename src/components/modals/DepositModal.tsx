@@ -912,7 +912,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         <div className="px-6 py-4 border-b border-glass-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <img src="/pay4pro-logo.svg" alt="Pay4Pro" className="h-5" />
+              <img src="/pay4pro-logo.svg" alt="Pay4Pro" className="h-8" />
               <span className="text-lg font-display font-bold text-white">Deposit</span>
             </div>
             {user && (
