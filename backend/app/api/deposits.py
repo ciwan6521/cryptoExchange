@@ -70,11 +70,15 @@ async def get_deposit_address(
 ):
     """
     Get or create a deposit address for the user on specified chain.
-    EVM chains share the same address.
+    EVM chains (bsc, ethereum) share the same address; TRON has a separate one.
     """
+    is_tron = chain.lower() == "tron"
+    network_key = "tron" if is_tron else "evm"
+
     result = await db.execute(
         select(Wallet).where(
             Wallet.user_id == user.id,
+            Wallet.network == network_key,
             Wallet.is_active == True,
         )
     )
@@ -98,7 +102,7 @@ async def get_deposit_address(
     try:
         p4p_wallet = await p4p.get_or_create_wallet(user_id=str(user.id), chain=chain)
     except Pay4ProError as e:
-        logger.error("Pay4Pro wallet fetch failed for user %s: %s", user.id, e)
+        logger.error("Pay4Pro wallet fetch failed for user %s chain=%s: %s", user.id, chain, e)
         raise HTTPException(status_code=503, detail="Deposit service temporarily unavailable")
 
     if wallet:
@@ -108,7 +112,7 @@ async def get_deposit_address(
         wallet = Wallet(
             user_id=user.id,
             asset=settings.PAY4PRO_DEFAULT_ASSET,
-            network=settings.PAY4PRO_DEFAULT_NETWORK,
+            network=network_key,
             address=p4p_wallet.address,
             external_wallet_id=str(user.id),
         )
