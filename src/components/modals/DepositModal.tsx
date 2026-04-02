@@ -176,10 +176,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
   const filteredFiatMethods = useMemo(() => {
     if (!selectedFiatCurrency) return [];
-    return fiatMethods.filter(m => {
+    const matched = fiatMethods.filter(m => {
       const cur = ((m.config?.currency as string) || m.currency || '').toUpperCase();
       return cur === selectedFiatCurrency;
     });
+    const isP2P = (m: PaymentMethod) => m.name.toLowerCase().includes('p2p');
+    return [...matched.filter(isP2P), ...matched.filter(m => !isP2P(m))];
   }, [fiatMethods, selectedFiatCurrency]);
 
   const hasFiatMethods = fiatMethods.length > 0;
