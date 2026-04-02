@@ -198,8 +198,8 @@ async def claim_deposit(
             amount=amount,
             currency=body.currency,
             method=body.method,
+            payment_method_id=body.payment_method_id,
             metadata={
-                "payment_method_id": body.payment_method_id,
                 "source": "crypto4pro_user_claim",
             },
         )

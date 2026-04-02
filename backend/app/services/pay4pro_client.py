@@ -261,6 +261,7 @@ class Pay4ProClient:
         amount: Decimal,
         currency: str = "USDT",
         method: str = "crypto",
+        payment_method_id: Optional[str] = None,
         metadata: Optional[dict] = None,
     ) -> dict:
         """
@@ -268,13 +269,16 @@ class Pay4ProClient:
 
         POST /api/deposit
         """
-        data = await self._request("POST", "/api/deposit", json_data={
+        payload: dict = {
             "user_id": user_id,
             "amount": float(amount),
             "currency": currency,
             "method": method,
             "metadata": metadata or {},
-        })
+        }
+        if payment_method_id:
+            payload["payment_method_id"] = payment_method_id
+        data = await self._request("POST", "/api/deposit", json_data=payload)
 
         logger.info(
             "Pay4Pro deposit created: tx=%s user=%s amount=%s %s",
