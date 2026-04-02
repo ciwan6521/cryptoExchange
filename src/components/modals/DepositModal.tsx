@@ -46,6 +46,55 @@ const FIAT_TYPE_ICONS: Record<string, React.ElementType> = {
   manual: CreditCard,
 };
 
+const BANK_DOMAIN: Record<string, string> = {
+  ziraat: 'ziraatbank.com.tr',
+  garanti: 'garantibbva.com.tr',
+  isbank: 'isbank.com.tr',
+  is: 'isbank.com.tr',
+  yapikredi: 'yapikredi.com.tr',
+  akbank: 'akbank.com',
+  halkbank: 'halkbank.com.tr',
+  vakifbank: 'vakifbank.com.tr',
+  finansbank: 'qnbfinansbank.com',
+  qnb: 'qnbfinansbank.com',
+  denizbank: 'denizbank.com',
+  teb: 'teb.com.tr',
+  ing: 'ing.com.tr',
+  hsbc: 'hsbc.com.tr',
+  kuveytturk: 'kuveytturk.com.tr',
+  enpara: 'enpara.com',
+  papara: 'papara.com',
+};
+
+const getBankLogo = (method: { type: string; config?: Record<string, unknown>; name?: string }): string | null => {
+  if (method.type === 'papara') return 'https://www.google.com/s2/favicons?domain=papara.com&sz=64';
+  const bankCode = ((method.config?.bank_code || '') as string).toLowerCase();
+  if (bankCode && BANK_DOMAIN[bankCode]) {
+    return `https://www.google.com/s2/favicons?domain=${BANK_DOMAIN[bankCode]}&sz=64`;
+  }
+  const bankName = ((method.config?.bank_name || method.config?.bankName || method.name || '') as string).toLowerCase();
+  for (const [key, domain] of Object.entries(BANK_DOMAIN)) {
+    if (bankName.includes(key) || bankName.includes(domain.split('.')[0])) {
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    }
+  }
+  return null;
+};
+
+const FLAG_CDN = 'https://flagcdn.com/w80';
+const CURRENCY_FLAG: Record<string, string> = {
+  TRY: `${FLAG_CDN}/tr.png`,
+  USD: `${FLAG_CDN}/us.png`,
+  EUR: `${FLAG_CDN}/eu.png`,
+  GBP: `${FLAG_CDN}/gb.png`,
+  RUB: `${FLAG_CDN}/ru.png`,
+  AED: `${FLAG_CDN}/ae.png`,
+  JPY: `${FLAG_CDN}/jp.png`,
+  CHF: `${FLAG_CDN}/ch.png`,
+  CAD: `${FLAG_CDN}/ca.png`,
+  AUD: `${FLAG_CDN}/au.png`,
+};
+
 const CURRENCY_META: Record<string, { symbol: string; name: string; flag: string }> = {
   TRY: { symbol: '₺', name: 'Turkish Lira', flag: '🇹🇷' },
   USD: { symbol: '$', name: 'US Dollar', flag: '🇺🇸' },
@@ -834,7 +883,11 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
-              <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
+              {CURRENCY_FLAG[selectedFiatCurrency] ? (
+                <img src={CURRENCY_FLAG[selectedFiatCurrency]} alt={selectedFiatCurrency} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
+              ) : (
+                <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
+              )}
               {selectedFiatCurrency} — {CURRENCY_META[selectedFiatCurrency]?.name || selectedFiatCurrency}
             </div>
           </div>
@@ -850,14 +903,19 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                 const Icon = FIAT_TYPE_ICONS[m.type] || CreditCard;
                 const typeLabel = FIAT_TYPE_LABELS[m.type] || m.type;
                 const bankName = (m.config?.bank_name || m.config?.bankName || '') as string;
+                const logo = getBankLogo(m);
                 return (
                   <button
                     key={m.id}
                     onClick={() => setSelectedMethod(m)}
                     className="p-4 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Icon className="w-5 h-5 text-brand-400" />
+                    <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center mx-auto mb-2 overflow-hidden">
+                      {logo ? (
+                        <img src={logo} alt={bankName || m.name} width={28} height={28} className="rounded" />
+                      ) : (
+                        <Icon className="w-5 h-5 text-brand-400" />
+                      )}
                     </div>
                     <div className="text-sm font-semibold text-white">{m.name}</div>
                     <div className="text-[11px] text-gray-500 mt-0.5">{typeLabel}</div>
@@ -882,13 +940,20 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
               const c = ((m.config?.currency as string) || m.currency || '').toUpperCase();
               return c === cur;
             }).length;
+            const flagSrc = CURRENCY_FLAG[cur];
             return (
               <button
                 key={cur}
                 onClick={() => setSelectedFiatCurrency(cur)}
                 className="p-4 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center"
               >
-                <div className="text-2xl mb-1.5">{meta?.flag || '💱'}</div>
+                <div className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center mx-auto mb-2 overflow-hidden">
+                  {flagSrc ? (
+                    <img src={flagSrc} alt={cur} width={40} height={40} className="object-cover w-full h-full" />
+                  ) : (
+                    <span className="text-xl">{meta?.flag || '💱'}</span>
+                  )}
+                </div>
                 <div className="text-sm font-semibold text-white">{cur}</div>
                 <div className="text-[11px] text-gray-500 mt-0.5">{meta?.name || cur}</div>
                 <div className="text-[10px] text-gray-600 mt-1">
