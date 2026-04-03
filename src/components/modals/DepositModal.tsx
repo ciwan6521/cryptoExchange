@@ -134,6 +134,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   }>>([]);
 
   const [selectedFiatCurrency, setSelectedFiatCurrency] = useState<string | null>(null);
+  const [selectedFiatCategory, setSelectedFiatCategory] = useState<'p2p' | 'credit_card' | null>(null);
 
   const [claimAmount, setClaimAmount] = useState('');
   const [claimSubmitting, setClaimSubmitting] = useState(false);
@@ -225,6 +226,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
     setDepositStep('select');
     setSelectedFiatCurrency(null);
+    setSelectedFiatCategory(null);
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -872,15 +874,15 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       );
     }
 
-    // Step 2: Method list for selected currency
-    if (selectedFiatCurrency) {
+    // Step 3: Method list (P2P category selected)
+    if (selectedFiatCurrency && selectedFiatCategory === 'p2p') {
       return (
         <div className="space-y-4">
           <button
-            onClick={() => setSelectedFiatCurrency(null)}
+            onClick={() => setSelectedFiatCategory(null)}
             className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
           >
-            <ChevronLeft className="w-3.5 h-3.5" /> Change currency
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to categories
           </button>
 
           <div className="text-center">
@@ -890,14 +892,14 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
               ) : (
                 <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
               )}
-              {selectedFiatCurrency} — {CURRENCY_META[selectedFiatCurrency]?.name || selectedFiatCurrency}
+              {selectedFiatCurrency} — P2P
             </div>
           </div>
 
           <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Method</label>
           {filteredFiatMethods.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-400">No methods available for {selectedFiatCurrency}</p>
+              <p className="text-sm text-gray-400">No P2P methods available for {selectedFiatCurrency}</p>
             </div>
           ) : (
             <div className={cn("grid gap-3", filteredFiatMethods.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
@@ -927,6 +929,89 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
               })}
             </div>
           )}
+        </div>
+      );
+    }
+
+    // Step 3: Credit Card (coming soon)
+    if (selectedFiatCurrency && selectedFiatCategory === 'credit_card') {
+      return (
+        <div className="space-y-4">
+          <button
+            onClick={() => setSelectedFiatCategory(null)}
+            className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to categories
+          </button>
+
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
+              {CURRENCY_FLAG[selectedFiatCurrency] ? (
+                <img src={CURRENCY_FLAG[selectedFiatCurrency]} alt={selectedFiatCurrency} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
+              ) : (
+                <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
+              )}
+              {selectedFiatCurrency} — Credit Card
+            </div>
+          </div>
+
+          <div className="text-center py-12">
+            <div className="w-14 h-14 rounded-2xl bg-surface-100 flex items-center justify-center mx-auto mb-4">
+              <CreditCard className="w-7 h-7 text-gray-500" />
+            </div>
+            <p className="text-sm font-medium text-gray-300 mb-1">Coming Soon</p>
+            <p className="text-xs text-gray-600">Credit card deposits will be available shortly.</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Step 2: Category selection (P2P / Credit Card)
+    if (selectedFiatCurrency) {
+      return (
+        <div className="space-y-4">
+          <button
+            onClick={() => setSelectedFiatCurrency(null)}
+            className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Change currency
+          </button>
+
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
+              {CURRENCY_FLAG[selectedFiatCurrency] ? (
+                <img src={CURRENCY_FLAG[selectedFiatCurrency]} alt={selectedFiatCurrency} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
+              ) : (
+                <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
+              )}
+              {selectedFiatCurrency} — {CURRENCY_META[selectedFiatCurrency]?.name || selectedFiatCurrency}
+            </div>
+          </div>
+
+          <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Payment Type</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setSelectedFiatCategory('p2p')}
+              className="p-5 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center"
+            >
+              <div className="w-12 h-12 rounded-xl bg-brand-500/10 flex items-center justify-center mx-auto mb-3">
+                <ArrowRight className="w-6 h-6 text-brand-400 rotate-45" />
+              </div>
+              <div className="text-sm font-semibold text-white">P2P</div>
+              <div className="text-[11px] text-gray-500 mt-0.5">Bank Transfer</div>
+            </button>
+
+            <button
+              onClick={() => setSelectedFiatCategory('credit_card')}
+              className="p-5 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center"
+            >
+              <div className="w-12 h-12 rounded-xl bg-brand-500/10 flex items-center justify-center mx-auto mb-3">
+                <CreditCard className="w-6 h-6 text-brand-400" />
+              </div>
+              <div className="text-sm font-semibold text-white">Credit Card</div>
+              <div className="text-[11px] text-gray-500 mt-0.5">Visa / Mastercard</div>
+            </button>
+          </div>
         </div>
       );
     }
@@ -1049,7 +1134,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                   </button>
                 )}
                 <button
-                  onClick={() => { setActiveTab('fiat'); setSelectedMethod(null); setSelectedFiatCurrency(null); }}
+                  onClick={() => { setActiveTab('fiat'); setSelectedMethod(null); setSelectedFiatCurrency(null); setSelectedFiatCategory(null); }}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors',
                     activeTab === 'fiat' ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
