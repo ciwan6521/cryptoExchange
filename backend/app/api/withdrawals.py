@@ -34,6 +34,7 @@ class WithdrawalRequest(BaseModel):
     network: str = Field(min_length=1, max_length=20)
     amount: str  # String to preserve Decimal precision
     to_address: str = Field(min_length=10, max_length=255)
+    totp_code: str = Field(min_length=6, max_length=6)
 
 
 class AddAddressRequest(BaseModel):
@@ -72,7 +73,19 @@ async def request_withdrawal(
     """
     Submit a withdrawal request. Funds are LOCKED (not deducted) immediately.
     An admin must approve before settlement occurs.
+    Requires 2FA (Google Authenticator) to be enabled and a valid TOTP code.
     """
+    if not user.totp_enabled or not user.totp_secret:
+        raise HTTPException(
+            status_code=403,
+            detail="Two-factor authentication (2FA) is required for withdrawals. Please enable Google Authenticator in your security settings.",
+        )
+
+    import pyotp
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(body.totp_code, valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid 2FA code")
+
     try:
         amount = Decimal(body.amount)
     except (InvalidOperation, ValueError):

@@ -280,6 +280,9 @@ function TwoFactorCard() {
   const [setupData, setSetupData] = useState<{ secret: string; provisioning_uri: string } | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showDisable, setShowDisable] = useState(false);
+  const [disableCode, setDisableCode] = useState('');
+  const [disablePassword, setDisablePassword] = useState('');
 
   const handleSetup = async () => {
     setLoading(true);
@@ -305,6 +308,22 @@ function TwoFactorCard() {
     } finally { setLoading(false); }
   };
 
+  const handleDisable = async () => {
+    if (disableCode.length !== 6) { toast.error('Enter a 6-digit code'); return; }
+    if (!disablePassword) { toast.error('Enter your password'); return; }
+    setLoading(true);
+    try {
+      await authApi.disable2FA(disableCode, disablePassword);
+      toast.success('2FA disabled');
+      setShowDisable(false);
+      setDisableCode('');
+      setDisablePassword('');
+      await restoreSession();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.detail : 'Failed to disable 2FA');
+    } finally { setLoading(false); }
+  };
+
   return (
     <Card>
       <div className="flex items-start justify-between">
@@ -316,18 +335,32 @@ function TwoFactorCard() {
             <h3 className="font-medium text-white">Two-Factor Authentication</h3>
             <p className="text-sm text-gray-400 mt-1">
               {user?.totp_enabled
-                ? '2FA is enabled on your account.'
-                : 'Add an extra layer of security using an authenticator app.'}
+                ? '2FA is enabled on your account. Required for withdrawals.'
+                : 'Enable 2FA to secure your account. Required for withdrawals.'}
             </p>
           </div>
         </div>
         {!user?.totp_enabled && !setupData && (
           <Button size="sm" onClick={handleSetup} loading={loading}>Enable</Button>
         )}
-        {user?.totp_enabled && (
-          <Badge variant="success" size="sm">Enabled</Badge>
+        {user?.totp_enabled && !showDisable && (
+          <div className="flex items-center gap-2">
+            <Badge variant="success" size="sm">Enabled</Badge>
+            <Button variant="ghost" size="sm" onClick={() => setShowDisable(true)} className="text-red-400 text-xs">
+              Disable
+            </Button>
+          </div>
         )}
       </div>
+
+      {!user?.totp_enabled && !setupData && (
+        <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-300 leading-relaxed">
+            2FA is required to make withdrawals. Please enable Google Authenticator to secure your account and unlock withdrawal functionality.
+          </p>
+        </div>
+      )}
 
       {setupData && (
         <div className="mt-6 space-y-4 border-t border-glass-border pt-6">
@@ -351,6 +384,38 @@ function TwoFactorCard() {
           <div className="flex gap-3">
             <Button onClick={handleEnable} loading={loading}>Verify & Enable</Button>
             <Button variant="secondary" onClick={() => setSetupData(null)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {showDisable && (
+        <div className="mt-6 space-y-4 border-t border-glass-border pt-6">
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-300 leading-relaxed">
+              Disabling 2FA will prevent you from making withdrawals until you re-enable it.
+            </p>
+          </div>
+          <div className="max-w-xs space-y-3">
+            <Input
+              label="Current Password"
+              type="password"
+              value={disablePassword}
+              onChange={(e) => setDisablePassword(e.target.value)}
+              placeholder="••••••••"
+              leftIcon={<Lock className="w-4 h-4" />}
+            />
+            <Input
+              label="Authenticator Code"
+              value={disableCode}
+              onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              leftIcon={<Shield className="w-4 h-4" />}
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button className="bg-red-500 hover:bg-red-400" onClick={handleDisable} loading={loading}>Disable 2FA</Button>
+            <Button variant="secondary" onClick={() => { setShowDisable(false); setDisableCode(''); setDisablePassword(''); }}>Cancel</Button>
           </div>
         </div>
       )}

@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { X, Send, AlertTriangle, Loader2, ChevronDown, Check } from 'lucide-react';
+import { X, Send, AlertTriangle, Loader2, ChevronDown, Check, Shield, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useBalanceStore } from '@/stores/balance-store';
+import { useAuthStore } from '@/stores/auth-store';
 import { depositApi, type ChainInfo } from '@/lib/api';
 
 interface WithdrawModalProps {
@@ -14,12 +15,14 @@ interface WithdrawModalProps {
 
 export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose }) => {
   const { balances, fetchBalances } = useBalanceStore();
+  const user = useAuthStore((s) => s.user);
   const [chains, setChains] = useState<ChainInfo[]>([]);
   const [selectedChain, setSelectedChain] = useState('bsc');
   const [chainDropdownOpen, setChainDropdownOpen] = useState(false);
   const [asset, setAsset] = useState('USDT');
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
+  const [totpCode, setTotpCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -44,6 +47,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
       setSuccess(false);
       setAddress('');
       setAmount('');
+      setTotpCode('');
 
       depositApi.getChains()
         .then(data => {
@@ -75,6 +79,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
     if (!address.trim()) { setError('Enter a withdrawal address'); return; }
     if (!amount || parseFloat(amount) <= 0) { setError('Enter a valid amount'); return; }
     if (parseFloat(amount) > available) { setError('Insufficient balance'); return; }
+    if (!totpCode || totpCode.length !== 6) { setError('Enter the 6-digit code from your authenticator app'); return; }
 
     setSubmitting(true);
     try {
@@ -87,6 +92,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
           network: selectedChain,
           amount,
           to_address: address,
+          totp_code: totpCode,
         }),
       });
       if (!res.ok) {
@@ -133,6 +139,23 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
               className="px-6 py-2 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors"
             >
               Close
+            </button>
+          </div>
+        ) : !user?.totp_enabled ? (
+          <div className="p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-7 h-7 text-amber-400" />
+            </div>
+            <h3 className="text-base font-semibold text-white mb-2">2FA Required</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              You must enable Two-Factor Authentication (Google Authenticator) before making withdrawals.
+            </p>
+            <button
+              onClick={() => { onClose(); window.location.href = '/settings'; }}
+              className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              Go to Security Settings
             </button>
           </div>
         ) : (
@@ -235,6 +258,26 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
               </p>
             </div>
 
+            {/* 2FA Code */}
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5">Google Authenticator Code</label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                  <Shield className="w-4 h-4 text-gray-500" />
+                </div>
+                <input
+                  className={inputCls + ' pl-9 tracking-[0.3em] font-mono'}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={e => { setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+                  placeholder="000000"
+                  autoComplete="one-time-code"
+                />
+              </div>
+            </div>
+
             {/* Warning */}
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
@@ -250,10 +293,10 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
             {/* Submit */}
             <button
               onClick={handleSubmit}
-              disabled={submitting || !address || !amount}
+              disabled={submitting || !address || !amount || totpCode.length !== 6}
               className={cn(
                 'w-full py-3 text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2',
-                submitting || !address || !amount
+                submitting || !address || !amount || totpCode.length !== 6
                   ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                   : 'bg-brand-500 hover:bg-brand-600 text-white'
               )}
