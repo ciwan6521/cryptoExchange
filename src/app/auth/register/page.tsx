@@ -139,7 +139,7 @@ export default function RegisterPage() {
         username: formData.username.trim(),
         password: formData.password,
       });
-      router.push('/dashboard');
+      router.push('/auth/verify-email');
     } catch (err: any) {
       const msg = err instanceof ApiError ? err.detail : 'Registration failed. Please try again.';
       setErrors({ form: msg });

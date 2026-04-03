@@ -31,6 +31,9 @@ email-validator==2.1.0
 python-dotenv==1.0.1
 httpx==0.27.0
 
+# Email
+sendgrid==6.11.0
+
 # Monitoring
 sentry-sdk[fastapi]
 

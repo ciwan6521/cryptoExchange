@@ -166,6 +166,17 @@ export const authApi = {
   verifyEmail: (token: string) =>
     request<{ ok: boolean; message: string }>(`/api/auth/verify-email?token=${token}`, { method: 'POST' }),
 
+  verifyEmailCode: (code: string) =>
+    request<{ ok: boolean; message: string }>('/api/auth/verify-email-code', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+
+  resendVerificationCode: () =>
+    request<{ ok: boolean; message: string }>('/api/auth/resend-verification-code', {
+      method: 'POST',
+    }),
+
   setup2FA: () =>
     request<{ secret: string; provisioning_uri: string }>('/api/auth/2fa/setup', { method: 'POST' }),
 

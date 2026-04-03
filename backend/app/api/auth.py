@@ -21,12 +21,13 @@ from app.schemas.auth import (
     RegisterRequest, LoginRequest, UserResponse,
     ForgotPasswordRequest, ResetPasswordRequest,
     ChangePasswordRequest, UpdateProfileRequest, SessionResponse,
+    VerifyEmailCodeRequest, ResendVerificationCodeRequest,
 )
 from app.utils.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 from app.api.deps import get_current_user
 from app.events.bus import EventBus
 from app.utils.password_policy import validate_password
-from app.services.email_service import send_password_reset_email, send_email_verification, send_login_alert
+from app.services.email_service import send_password_reset_email, send_email_verification, send_login_alert, send_verification_code
 from app.middleware.rate_limit import rate_limit_auth
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -135,13 +136,14 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
     except Exception:
         pass
 
-    # Send verification email (non-blocking — don't fail registration)
+    # Send 6-digit verification code (non-blocking — don't fail registration)
     try:
-        token = secrets.token_urlsafe(48)
+        import random
+        code = f"{random.randint(0, 999999):06d}"
         r = await _get_redis()
-        await r.setex(f"{VERIFY_TOKEN_PREFIX}{token}", VERIFY_TOKEN_TTL, str(user.id))
+        await r.setex(f"{VERIFY_CODE_PREFIX}{user.id}", VERIFY_CODE_TTL, code)
         await r.aclose()
-        send_email_verification(user.email, token)
+        send_verification_code(user.email, code)
     except Exception:
         pass
 
@@ -305,8 +307,10 @@ async def _get_redis() -> aioredis.Redis:
 
 RESET_TOKEN_PREFIX = "pw_reset:"
 VERIFY_TOKEN_PREFIX = "email_verify:"
+VERIFY_CODE_PREFIX = "email_verify_code:"
 RESET_TOKEN_TTL = 3600        # 1 hour
 VERIFY_TOKEN_TTL = 86400      # 24 hours
+VERIFY_CODE_TTL = 600          # 10 minutes
 
 
 # ── Forgot Password ──
@@ -397,6 +401,52 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
     await r.delete(f"{VERIFY_TOKEN_PREFIX}{token}")
     await r.aclose()
     return {"ok": True, "message": "Email verified successfully"}
+
+
+# ── Email Verification (6-digit code) ──
+
+@router.post("/verify-email-code")
+async def verify_email_code(
+    body: VerifyEmailCodeRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.email_verified:
+        return {"ok": True, "message": "Email already verified"}
+
+    r = await _get_redis()
+    stored_code = await r.get(f"{VERIFY_CODE_PREFIX}{user.id}")
+    if not stored_code:
+        await r.aclose()
+        raise HTTPException(status_code=400, detail="Verification code expired. Please request a new one.")
+
+    stored_code = stored_code.decode() if isinstance(stored_code, bytes) else stored_code
+    if stored_code != body.code:
+        await r.aclose()
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+
+    user.email_verified = True
+    await db.commit()
+
+    await r.delete(f"{VERIFY_CODE_PREFIX}{user.id}")
+    await r.aclose()
+    return {"ok": True, "message": "Email verified successfully"}
+
+
+@router.post("/resend-verification-code")
+async def resend_verification_code(
+    user: User = Depends(get_current_user),
+):
+    if user.email_verified:
+        return {"ok": True, "message": "Email already verified"}
+
+    import random
+    code = f"{random.randint(0, 999999):06d}"
+    r = await _get_redis()
+    await r.setex(f"{VERIFY_CODE_PREFIX}{user.id}", VERIFY_CODE_TTL, code)
+    await r.aclose()
+    send_verification_code(user.email, code)
+    return {"ok": True, "message": "Verification code sent"}
 
 
 # ── Change Password ──

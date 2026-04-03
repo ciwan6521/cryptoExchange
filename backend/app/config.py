@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "Crypto4Pro"
     BASE_URL: str = "https://crypto4pro.io"
 
+    # ── SendGrid ──
+    SENDGRID_API_KEY: str = ""
+    SENDGRID_FROM_EMAIL: str = "noreply@crypto4pro.io"
+
     # ── Alerting ──
     ALERT_WEBHOOK_URL: str = ""  # Slack/Discord webhook URL (empty = log only)
 

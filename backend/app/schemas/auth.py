@@ -100,3 +100,11 @@ class SessionResponse(BaseModel):
     user_agent: Optional[str] = None
     created_at: str
     is_current: bool = False
+
+
+class VerifyEmailCodeRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
+
+
+class ResendVerificationCodeRequest(BaseModel):
+    email: EmailStr
