@@ -36,7 +36,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.wallet import Wallet, Deposit, Withdrawal
+from app.models.wallet import Deposit, Withdrawal
 from app.models.cms import AuditLog
 from app.services.ledger_service import LedgerService
 from app.services.pay4pro_client import get_pay4pro_client
@@ -158,12 +158,6 @@ async def _handle_deposit_confirmed(
     if existing and existing.status == "completed":
         logger.info("Deposit %s already completed — idempotent skip", transaction_id)
         return {"ok": True, "message": "Already processed", "deposit_id": str(existing.id)}
-
-    # Find the user's wallet (for reference, not strictly required)
-    wallet_result = await db.execute(
-        select(Wallet).where(Wallet.user_id == user_id)
-    )
-    wallet = wallet_result.scalar_one_or_none()
 
     # Create or update deposit record
     source = payload.get("source", "")
