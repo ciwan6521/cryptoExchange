@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2, Banknote, TrendingUp, Info } from 'lucide-react';
+import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2, Banknote, TrendingUp, Info, Zap } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
 import { depositApi, type PaymentMethod, type ChainInfo, type MethodRateInfo } from '@/lib/api';
@@ -135,6 +135,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
   const [selectedFiatCurrency, setSelectedFiatCurrency] = useState<string | null>(null);
   const [selectedFiatCategory, setSelectedFiatCategory] = useState<'p2p' | 'credit_card' | null>(null);
+  const [selectedBank, setSelectedBank] = useState<string | null>(null);
 
   const [claimAmount, setClaimAmount] = useState('');
   const [claimSubmitting, setClaimSubmitting] = useState(false);
@@ -185,6 +186,42 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     return [...matched.filter(isP2P), ...matched.filter(m => !isP2P(m))];
   }, [fiatMethods, selectedFiatCurrency]);
 
+  const bankGroups = useMemo(() => {
+    if (!filteredFiatMethods.length) return [];
+
+    const fastMethods: PaymentMethod[] = [];
+    const bankMap = new Map<string, PaymentMethod[]>();
+
+    for (const m of filteredFiatMethods) {
+      if (m.config?.is_fast === true || m.config?.is_fast === 'true') {
+        fastMethods.push(m);
+        continue;
+      }
+      const rawName = (m.config?.bank_name || m.config?.bankName || '') as string;
+      let bankKey = rawName.trim();
+      if (!bankKey) {
+        const nameParts = m.name.split(' - ');
+        bankKey = nameParts.length > 1 ? nameParts[0].trim() : m.name.trim();
+      }
+      const existing = bankMap.get(bankKey) || [];
+      existing.push(m);
+      bankMap.set(bankKey, existing);
+    }
+
+    const groups: { bankName: string; logo: string | null; methods: PaymentMethod[]; isFast: boolean }[] = [];
+
+    if (fastMethods.length > 0) {
+      groups.push({ bankName: 'Fast', logo: null, methods: fastMethods, isFast: true });
+    }
+
+    Array.from(bankMap.entries()).forEach(([bankName, methods]) => {
+      const logo = methods[0] ? getBankLogo(methods[0]) : null;
+      groups.push({ bankName, logo, methods, isFast: false });
+    });
+
+    return groups;
+  }, [filteredFiatMethods]);
+
   const hasFiatMethods = fiatMethods.length > 0;
 
   const fetchAddress = useCallback(async (chain: string) => {
@@ -227,6 +264,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     setDepositStep('select');
     setSelectedFiatCurrency(null);
     setSelectedFiatCategory(null);
+    setSelectedBank(null);
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -740,7 +778,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             onClick={() => { setSelectedMethod(null); resetClaimForm(); }}
             className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
           >
-            <ChevronLeft className="w-3.5 h-3.5" /> Back to methods
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to accounts
           </button>
           <div className="text-center mb-2">
             <h3 className="text-base font-semibold text-white">{selectedMethod.name}</h3>
@@ -874,36 +912,42 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       );
     }
 
-    // Step 3: Method list (P2P category selected)
-    if (selectedFiatCurrency && selectedFiatCategory === 'p2p') {
+    // Step 4: Method list for selected bank
+    if (selectedFiatCurrency && selectedFiatCategory === 'p2p' && selectedBank) {
+      const group = bankGroups.find(g => g.isFast ? selectedBank === '__fast__' : g.bankName === selectedBank);
+      const bankMethods = group?.methods || [];
+      const bankLabel = group?.isFast ? 'Fast' : group?.bankName || selectedBank;
+
       return (
         <div className="space-y-4">
           <button
-            onClick={() => setSelectedFiatCategory(null)}
+            onClick={() => setSelectedBank(null)}
             className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
           >
-            <ChevronLeft className="w-3.5 h-3.5" /> Back to categories
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to banks
           </button>
 
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
-              {CURRENCY_FLAG[selectedFiatCurrency] ? (
-                <img src={CURRENCY_FLAG[selectedFiatCurrency]} alt={selectedFiatCurrency} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
+              {group?.isFast ? (
+                <Zap className="w-4 h-4 text-amber-400" />
+              ) : group?.logo ? (
+                <img src={group.logo} alt={bankLabel} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
               ) : (
-                <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
+                <Building2 className="w-4 h-4" />
               )}
-              {selectedFiatCurrency} — P2P
+              {bankLabel}
             </div>
           </div>
 
-          <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Method</label>
-          {filteredFiatMethods.length === 0 ? (
+          <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Account</label>
+          {bankMethods.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-400">No P2P methods available for {selectedFiatCurrency}</p>
+              <p className="text-sm text-gray-400">No accounts available</p>
             </div>
           ) : (
-            <div className={cn("grid gap-3", filteredFiatMethods.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
-              {filteredFiatMethods.map(m => {
+            <div className={cn("grid gap-3", bankMethods.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
+              {bankMethods.map(m => {
                 const Icon = FIAT_TYPE_ICONS[m.type] || CreditCard;
                 const typeLabel = FIAT_TYPE_LABELS[m.type] || m.type;
                 const bankName = (m.config?.bank_name || m.config?.bankName || '') as string;
@@ -927,6 +971,70 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                   </button>
                 );
               })}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Step 3: Bank selection (P2P category selected)
+    if (selectedFiatCurrency && selectedFiatCategory === 'p2p') {
+      return (
+        <div className="space-y-4">
+          <button
+            onClick={() => setSelectedFiatCategory(null)}
+            className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to categories
+          </button>
+
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
+              {CURRENCY_FLAG[selectedFiatCurrency] ? (
+                <img src={CURRENCY_FLAG[selectedFiatCurrency]} alt={selectedFiatCurrency} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
+              ) : (
+                <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
+              )}
+              {selectedFiatCurrency} — P2P
+            </div>
+          </div>
+
+          <label className="block text-xs font-medium text-gray-400 mb-2.5">Select Bank</label>
+          {bankGroups.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-400">No P2P methods available for {selectedFiatCurrency}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {bankGroups.map(group => (
+                <button
+                  key={group.isFast ? '__fast__' : group.bankName}
+                  onClick={() => setSelectedBank(group.isFast ? '__fast__' : group.bankName)}
+                  className={cn(
+                    "p-4 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center",
+                    group.isFast && "col-span-2 border-amber-500/20 bg-amber-500/[0.03] hover:border-amber-500/40"
+                  )}
+                >
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2 overflow-hidden",
+                    group.isFast ? "bg-amber-500/10" : "bg-white/[0.06]"
+                  )}>
+                    {group.isFast ? (
+                      <Zap className="w-5 h-5 text-amber-400" />
+                    ) : group.logo ? (
+                      <img src={group.logo} alt={group.bankName} width={28} height={28} className="rounded" />
+                    ) : (
+                      <Building2 className="w-5 h-5 text-brand-400" />
+                    )}
+                  </div>
+                  <div className={cn("text-sm font-semibold", group.isFast ? "text-amber-400" : "text-white")}>
+                    {group.bankName}
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    {group.methods.length} {group.methods.length === 1 ? 'account' : 'accounts'}
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -971,7 +1079,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       return (
         <div className="space-y-4">
           <button
-            onClick={() => setSelectedFiatCurrency(null)}
+            onClick={() => { setSelectedFiatCurrency(null); setSelectedFiatCategory(null); setSelectedBank(null); }}
             className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
           >
             <ChevronLeft className="w-3.5 h-3.5" /> Change currency
@@ -1134,7 +1242,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                   </button>
                 )}
                 <button
-                  onClick={() => { setActiveTab('fiat'); setSelectedMethod(null); setSelectedFiatCurrency(null); setSelectedFiatCategory(null); }}
+                  onClick={() => { setActiveTab('fiat'); setSelectedMethod(null); setSelectedFiatCurrency(null); setSelectedFiatCategory(null); setSelectedBank(null); }}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors',
                     activeTab === 'fiat' ? 'bg-surface-200 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
