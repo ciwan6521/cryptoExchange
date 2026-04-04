@@ -74,6 +74,10 @@ services:
       - PAY4PRO_BASE_URL=${PAY4PRO_BASE_URL:-}
       - PAY4PRO_API_KEY=${PAY4PRO_API_KEY:-}
       - PAY4PRO_WEBHOOK_SECRET=${PAY4PRO_WEBHOOK_SECRET:-}
+      # SendGrid Email
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL:-info@pay4pro.io}
+      - BASE_URL=https://crypto4pro.io
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
     ports:
       - "127.0.0.1:8001:8000"
