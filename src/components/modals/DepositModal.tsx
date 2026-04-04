@@ -192,17 +192,19 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     const fastMethods: PaymentMethod[] = [];
     const bankMap = new Map<string, PaymentMethod[]>();
 
+    const getBankKey = (m: PaymentMethod): string => {
+      const rawName = (m.config?.bank_name || m.config?.bankName || '') as string;
+      const key = rawName.trim();
+      if (key) return key;
+      const nameParts = m.name.split(' - ');
+      return nameParts.length > 1 ? nameParts[0].trim() : m.name.trim();
+    };
+
     for (const m of filteredFiatMethods) {
       if (m.config?.is_fast === true || m.config?.is_fast === 'true') {
         fastMethods.push(m);
-        continue;
       }
-      const rawName = (m.config?.bank_name || m.config?.bankName || '') as string;
-      let bankKey = rawName.trim();
-      if (!bankKey) {
-        const nameParts = m.name.split(' - ');
-        bankKey = nameParts.length > 1 ? nameParts[0].trim() : m.name.trim();
-      }
+      const bankKey = getBankKey(m);
       const existing = bankMap.get(bankKey) || [];
       existing.push(m);
       bankMap.set(bankKey, existing);
@@ -214,9 +216,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       groups.push({ bankName: 'Fast', logo: null, methods: fastMethods, isFast: true });
     }
 
-    Array.from(bankMap.entries()).forEach(([bankName, methods]) => {
-      const logo = methods[0] ? getBankLogo(methods[0]) : null;
-      groups.push({ bankName, logo, methods, isFast: false });
+    Array.from(bankMap.entries()).forEach(([bankName, bankMethods]) => {
+      const logo = bankMethods[0] ? getBankLogo(bankMethods[0]) : null;
+      groups.push({ bankName, logo, methods: bankMethods, isFast: false });
     });
 
     return groups;
@@ -946,28 +948,33 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
               <p className="text-sm text-gray-400">No accounts available</p>
             </div>
           ) : (
-            <div className={cn("grid gap-3", bankMethods.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
+            <div className="space-y-2">
               {bankMethods.map(m => {
-                const Icon = FIAT_TYPE_ICONS[m.type] || CreditCard;
-                const typeLabel = FIAT_TYPE_LABELS[m.type] || m.type;
-                const bankName = (m.config?.bank_name || m.config?.bankName || '') as string;
                 const logo = getBankLogo(m);
+                const holder = (m.config?.account_holder || m.config?.accountHolder || '') as string;
+                const iban = (m.config?.iban || m.config?.account_number || '') as string;
+                const maskedIban = iban ? `****${iban.slice(-4)}` : '';
+                const displayName = holder || m.name;
                 return (
                   <button
                     key={m.id}
                     onClick={() => setSelectedMethod(m)}
-                    className="p-4 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center"
+                    className="w-full p-3.5 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all flex items-center gap-3 text-left"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center mx-auto mb-2 overflow-hidden">
+                    <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
                       {logo ? (
-                        <img src={logo} alt={bankName || m.name} width={28} height={28} className="rounded" />
+                        <img src={logo} alt={displayName} width={28} height={28} className="rounded" />
                       ) : (
-                        <Icon className="w-5 h-5 text-brand-400" />
+                        <Building2 className="w-5 h-5 text-brand-400" />
                       )}
                     </div>
-                    <div className="text-sm font-semibold text-white">{m.name}</div>
-                    <div className="text-[11px] text-gray-500 mt-0.5">{typeLabel}</div>
-                    {bankName && <div className="text-[10px] text-gray-600 mt-0.5">{bankName}</div>}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-white truncate">{displayName}</div>
+                      {maskedIban && (
+                        <div className="text-[11px] text-gray-500 mt-0.5 font-mono">{maskedIban}</div>
+                      )}
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />
                   </button>
                 );
               })}
