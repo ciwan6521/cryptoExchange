@@ -577,6 +577,12 @@ export interface MethodRateInfo {
   effective_rate: number;
   amount?: number;
   converted_amount?: number;
+  admin_fee_percent: number;
+  display_rate: number;
+  deposit_fee_percent: number;
+  gross_amount?: number;
+  deposit_fee_amount?: number;
+  net_amount?: number;
 }
 
 export const depositApi = {

@@ -190,6 +190,15 @@ async def _handle_deposit_confirmed(
         db.add(deposit)
         await db.flush()
 
+    # Determine credit amount — use pre-calculated net for fiat deposits
+    credit_amount = amount
+    if deposit.expected_net_amount and deposit.expected_net_amount > Decimal("0"):
+        credit_amount = min(deposit.expected_net_amount, amount)
+        logger.info(
+            "Deposit fee applied: p4p_amount=%s expected_net=%s credit=%s fee_pct=%s",
+            amount, deposit.expected_net_amount, credit_amount, deposit.deposit_fee_percent,
+        )
+
     # Credit user balance via LedgerService
     ledger = LedgerService(db)
     ledger_key = f"p4p_deposit_credit:{transaction_id}"
@@ -198,19 +207,19 @@ async def _handle_deposit_confirmed(
         entry = await ledger.credit(
             user_id=user_id,
             asset=currency,
-            amount=amount,
+            amount=credit_amount,
             category="deposit",
             idempotency_key=ledger_key,
             reference_type="deposit",
             reference_id=deposit.id,
-            description=f"Deposit {amount} {currency} tx:{tx_hash[:16]}..." if tx_hash else f"Deposit {amount} {currency}",
+            description=f"Deposit {credit_amount} {currency} tx:{tx_hash[:16]}..." if tx_hash else f"Deposit {credit_amount} {currency}",
         )
 
     if entry:
         deposit.ledger_tx_id = entry.tx_id
         logger.info(
             "Deposit credited: user=%s amount=%s %s tx=%s",
-            user_id, amount, currency, tx_hash,
+            user_id, credit_amount, currency, tx_hash,
         )
     else:
         logger.info("Deposit ledger credit idempotent skip for %s", transaction_id)

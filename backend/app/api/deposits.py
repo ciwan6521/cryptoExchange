@@ -214,6 +214,31 @@ async def claim_deposit(
     tx_id = p4p_result.get("transaction_id", "")
     idempotency_key = f"deposit-claim-{tx_id or uuid.uuid4()}"
 
+    fee_kwargs: dict = {}
+    if body.payment_method_id:
+        try:
+            rate_info = await p4p.get_payment_method_rate(
+                body.payment_method_id, amount=float(amount),
+            )
+            base_rate = Decimal(str(rate_info.get("base_rate", 0)))
+            markup_pct = Decimal(str(rate_info.get("markup_percent", 0)))
+            if base_rate > 0:
+                admin_fee = Decimal("1")
+                display_rate = base_rate * (1 + admin_fee / 100)
+                gross = amount / display_rate
+                fee_amt = gross * markup_pct / 100
+                net = gross - fee_amt
+                fee_kwargs = {
+                    "base_rate_at_claim": base_rate,
+                    "deposit_fee_percent": markup_pct,
+                    "gross_amount": gross,
+                    "deposit_fee": fee_amt,
+                    "expected_net_amount": net,
+                    "fiat_payment_method_id": body.payment_method_id,
+                }
+        except Exception as exc:
+            logger.warning("Failed to fetch rate for fee calc: %s", exc)
+
     deposit = Deposit(
         user_id=user.id,
         asset=body.currency,
@@ -222,6 +247,7 @@ async def claim_deposit(
         status="pending",
         pay4pro_deposit_id=tx_id,
         idempotency_key=idempotency_key,
+        **fee_kwargs,
     )
     db.add(deposit)
     await db.commit()

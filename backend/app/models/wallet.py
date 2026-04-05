@@ -44,6 +44,14 @@ class Deposit(Base):
     status: Mapped[str] = mapped_column(String(15), nullable=False, default="pending", index=True)
     # Status: pending, confirming, completed, failed
 
+    # Fee data (stored at claim time for fiat deposits)
+    deposit_fee_percent: Mapped[Decimal | None] = mapped_column(Numeric(36, 18), nullable=True)
+    deposit_fee: Mapped[Decimal] = mapped_column(Numeric(36, 18), nullable=False, default=Decimal("0"))
+    gross_amount: Mapped[Decimal | None] = mapped_column(Numeric(36, 18), nullable=True)
+    expected_net_amount: Mapped[Decimal | None] = mapped_column(Numeric(36, 18), nullable=True)
+    base_rate_at_claim: Mapped[Decimal | None] = mapped_column(Numeric(36, 18), nullable=True)
+    fiat_payment_method_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     # Pay4Pro reference
     pay4pro_deposit_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
 

@@ -3,6 +3,8 @@ Public market data routes — trading pairs, tickers, orderbook, klines.
 Price data sourced from Binance API via backend cache / proxy.
 """
 
+from decimal import Decimal
+
 import httpx
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select
@@ -132,16 +134,45 @@ async def get_deposit_methods():
         return {"methods": []}
 
 
+ADMIN_FEE_PERCENT = Decimal("1")
+
+
 @router.get("/payment-method-rate/{payment_method_id}")
 async def get_payment_method_rate(
     payment_method_id: str,
     amount: float | None = Query(None, gt=0, description="Amount to convert"),
 ):
-    """Proxy Pay4Pro rate endpoint — returns exchange rate + optional conversion."""
+    """
+    Fetch rate from Pay4Pro and transform: apply 1% admin fee to display rate,
+    expose markup_percent as deposit_fee_percent, and compute gross/fee/net.
+    """
     from app.services.pay4pro_client import Pay4ProClient, Pay4ProError
     client = Pay4ProClient()
     try:
         data = await client.get_payment_method_rate(payment_method_id, amount=amount)
-        return data
     except Pay4ProError as exc:
         raise HTTPException(status_code=exc.status_code or 502, detail=exc.message)
+
+    base_rate = Decimal(str(data.get("base_rate", 0)))
+    markup_pct = Decimal(str(data.get("markup_percent", 0)))
+    display_rate = base_rate * (1 + ADMIN_FEE_PERCENT / 100) if base_rate > 0 else Decimal(0)
+
+    result = {
+        **data,
+        "admin_fee_percent": float(ADMIN_FEE_PERCENT),
+        "display_rate": float(round(display_rate, 6)),
+        "deposit_fee_percent": float(markup_pct),
+    }
+
+    if amount and display_rate > 0:
+        amt = Decimal(str(amount))
+        gross = amt / display_rate
+        fee = gross * markup_pct / 100
+        net = gross - fee
+        result.update({
+            "gross_amount": float(round(gross, 6)),
+            "deposit_fee_amount": float(round(fee, 6)),
+            "net_amount": float(round(net, 6)),
+        })
+
+    return result

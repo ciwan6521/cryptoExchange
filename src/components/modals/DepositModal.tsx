@@ -866,22 +866,35 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                           <span className="text-[11px] text-gray-400">Current Rate</span>
                         </div>
                         <span className="text-xs font-semibold text-white">
-                          1 {rateInfo.target_currency} = {rateInfo.effective_rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} {rateInfo.currency}
+                          1 {rateInfo.target_currency} = {rateInfo.display_rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} {rateInfo.currency}
                         </span>
                       </div>
-                      {rateInfo.converted_amount != null && (
+                      {rateInfo.gross_amount != null && (
+                        <>
+                          <div className="flex items-center justify-between pt-1 border-t border-white/[0.04]">
+                            <span className="text-[11px] text-gray-400">Gross Amount</span>
+                            <span className="text-xs text-gray-300">
+                              ~{rateInfo.gross_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {rateInfo.target_currency}
+                            </span>
+                          </div>
+                          {rateInfo.deposit_fee_percent > 0 && rateInfo.deposit_fee_amount != null && (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1">
+                                <Info className="w-3 h-3 text-yellow-500/70" />
+                                <span className="text-[11px] text-gray-400">Deposit Fee ({rateInfo.deposit_fee_percent}%)</span>
+                              </div>
+                              <span className="text-xs text-yellow-400">
+                                -{rateInfo.deposit_fee_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {rateInfo.target_currency}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {rateInfo.net_amount != null && (
                         <div className="flex items-center justify-between pt-1 border-t border-white/[0.04]">
                           <span className="text-[11px] text-gray-400">You will receive</span>
                           <span className="text-sm font-bold text-brand-400">
-                            ~{rateInfo.converted_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {rateInfo.target_currency}
-                          </span>
-                        </div>
-                      )}
-                      {rateInfo.markup_percent > 0 && (
-                        <div className="flex items-center gap-1 pt-1">
-                          <Info className="w-3 h-3 text-gray-600" />
-                          <span className="text-[10px] text-gray-600">
-                            Rate spread: %{rateInfo.markup_percent}
+                            ~{rateInfo.net_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {rateInfo.target_currency}
                           </span>
                         </div>
                       )}
