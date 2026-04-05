@@ -294,7 +294,7 @@ function UploadSlot({
   description: string;
   icon: React.ReactNode;
   slot: DocSlot;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLInputElement>;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDrop: (e: React.DragEvent) => void;
   onClickUpload: () => void;
