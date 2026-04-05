@@ -14,6 +14,9 @@ export interface AuthUser {
   id: string;
   email: string;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
   memberTier: string;
   isActive: boolean;
   isVerified: boolean;
@@ -32,7 +35,7 @@ interface AuthState {
   error: string | null;
 
   // Actions — all go through backend
-  register: (data: { email: string; username: string; password: string }) => Promise<void>;
+  register: (data: { email: string; username: string; password: string; first_name: string; last_name: string; phone: string }) => Promise<void>;
   login: (data: { email: string; password: string; totp_code?: string }) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
@@ -48,6 +51,9 @@ function mapUser(u: UserResponse): AuthUser {
     id: u.id,
     email: u.email,
     username: u.username,
+    firstName: u.first_name,
+    lastName: u.last_name,
+    phone: u.phone,
     memberTier: u.member_tier || 'standard',
     isActive: u.is_active,
     isVerified: u.is_verified,

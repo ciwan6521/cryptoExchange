@@ -340,3 +340,59 @@ export const adminLogsApi = {
     );
   },
 };
+
+// ============================================
+// Admin KYC
+// ============================================
+
+export interface KYCDocItem {
+  id: string;
+  document_type: string;
+  status: string;
+  rejection_reason: string | null;
+  original_filename?: string | null;
+  created_at: string | null;
+}
+
+export interface KYCRequestItem {
+  user_id: string;
+  email: string;
+  username: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  kyc_status: string;
+  created_at: string | null;
+  documents: KYCDocItem[];
+}
+
+export const adminKYCApi = {
+  list: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set('status', params.status);
+    if (params?.limit) sp.set('limit', String(params.limit));
+    if (params?.offset) sp.set('offset', String(params.offset));
+    const qs = sp.toString();
+    return adminRequest<{ requests: KYCRequestItem[]; total: number }>(
+      `/api/admin/kyc/requests${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  getDetail: (userId: string) =>
+    adminRequest<KYCRequestItem>(`/api/admin/kyc/requests/${userId}`),
+
+  getDocumentUrl: (docId: string) =>
+    `/api/admin/kyc/document/${docId}/image`,
+
+  approve: (userId: string) =>
+    adminRequest<{ ok: boolean; message: string; kyc_status: string }>(
+      `/api/admin/kyc/${userId}/approve`,
+      { method: 'POST' },
+    ),
+
+  reject: (userId: string, reason: string) =>
+    adminRequest<{ ok: boolean; message: string; kyc_status: string }>(
+      `/api/admin/kyc/${userId}/reject`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+    ),
+};

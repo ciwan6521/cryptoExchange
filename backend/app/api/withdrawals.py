@@ -75,6 +75,12 @@ async def request_withdrawal(
     An admin must approve before settlement occurs.
     Requires 2FA (Google Authenticator) to be enabled and a valid TOTP code.
     """
+    if user.kyc_status != "approved":
+        raise HTTPException(
+            status_code=403,
+            detail="KYC verification is required for withdrawals. Please complete identity verification first.",
+        )
+
     if not user.totp_enabled or not user.totp_secret:
         raise HTTPException(
             status_code=403,

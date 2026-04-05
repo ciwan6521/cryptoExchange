@@ -90,6 +90,9 @@ export interface UserResponse {
   id: string;
   email: string;
   username: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
   is_active: boolean;
   is_verified: boolean;
   email_verified: boolean;
@@ -110,7 +113,7 @@ export interface SessionItem {
 }
 
 export const authApi = {
-  register: (data: { email: string; username: string; password: string }) =>
+  register: (data: { email: string; username: string; password: string; first_name: string; last_name: string; phone: string }) =>
     request<UserResponse>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -682,4 +685,47 @@ export const walletApi = {
 
   getTickers: () =>
     request<TickersResponse>('/api/market/tickers'),
+};
+
+// ── KYC ──
+
+export interface KYCDocument {
+  id: string;
+  document_type: string;
+  status: string;
+  rejection_reason: string | null;
+  created_at: string | null;
+}
+
+export interface KYCStatusResponse {
+  kyc_status: string;
+  documents: KYCDocument[];
+}
+
+export const kycApi = {
+  getStatus: () =>
+    request<KYCStatusResponse>('/api/kyc/status'),
+
+  upload: async (documentType: string, file: File) => {
+    const formData = new FormData();
+    formData.append('document_type', documentType);
+    formData.append('file', file);
+
+    const res = await fetch('/api/kyc/upload', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      let detail = 'Upload failed';
+      try {
+        const body = await res.json();
+        detail = body.detail || detail;
+      } catch {}
+      throw new ApiError(res.status, detail);
+    }
+
+    return res.json();
+  },
 };

@@ -9,6 +9,9 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=128)
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    phone: str = Field(min_length=7, max_length=20)
 
 
 class LoginRequest(BaseModel):
@@ -32,6 +35,9 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     username: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
     is_active: bool
     is_verified: bool
     email_verified: bool

@@ -78,6 +78,8 @@ services:
       - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
       - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL:-info@pay4pro.io}
       - BASE_URL=https://crypto4pro.io
+    volumes:
+      - kyc_uploads:/app/uploads/kyc
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
     ports:
       - "127.0.0.1:8001:8000"
@@ -189,6 +191,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  kyc_uploads:
     driver: local
 
 networks:

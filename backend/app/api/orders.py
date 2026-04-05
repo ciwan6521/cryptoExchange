@@ -83,6 +83,12 @@ async def place_order(
     Place a new order. Funds are locked immediately.
     If matches exist, fills are executed atomically.
     """
+    if user.kyc_status != "approved":
+        raise HTTPException(
+            status_code=403,
+            detail="KYC verification is required for trading. Please complete identity verification first.",
+        )
+
     try:
         quantity = Decimal(body.quantity)
     except (InvalidOperation, ValueError):

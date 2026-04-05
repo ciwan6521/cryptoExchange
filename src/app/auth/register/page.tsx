@@ -5,17 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, ArrowRight, Check, X, AlertTriangle } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Check, X, AlertTriangle, Phone, UserCircle } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAdminStore } from '@/stores/admin-store';
 import { ApiError } from '@/lib/api';
-
-// ============================================
-// Register Page
-// New user registration with validation
-// ============================================
 
 const passwordRequirements = [
   { label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
@@ -25,9 +20,9 @@ const passwordRequirements = [
   { label: 'One special character', test: (p: string) => /[!@#$%^&*]/.test(p) },
 ];
 
-// Stricter email regex — requires proper TLD
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/;
 const USERNAME_MAX_LENGTH = 20;
+const PHONE_REGEX = /^\+?[0-9\s\-()]{7,20}$/;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -36,6 +31,9 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
     email: '',
     username: '',
     password: '',
@@ -43,17 +41,17 @@ export default function RegisterPage() {
     agreeTerms: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // Focus management refs
+
+  const firstNameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
-  
-  // Auto-focus on step change
+
   useEffect(() => {
-    if (step === 1) emailRef.current?.focus();
-    if (step === 2) passwordRef.current?.focus();
+    if (step === 1) firstNameRef.current?.focus();
+    if (step === 2) emailRef.current?.focus();
+    if (step === 3) passwordRef.current?.focus();
   }, [step]);
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -64,18 +62,35 @@ export default function RegisterPage() {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
-  
+
   const validateStep1 = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
+    }
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
+    }
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!PHONE_REGEX.test(formData.phone.trim())) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
     const email = formData.email.trim();
     const username = formData.username.trim();
-    
+
     if (!email) {
       newErrors.email = 'Email is required';
     } else if (!EMAIL_REGEX.test(email)) {
       newErrors.email = 'Please enter a valid email address';
     }
-    
+
     if (!username) {
       newErrors.username = 'Username is required';
     } else if (username.length < 3) {
@@ -87,14 +102,14 @@ export default function RegisterPage() {
     } else if (/^_|_$/.test(username)) {
       newErrors.username = 'Username cannot start or end with an underscore';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  
-  const validateStep2 = () => {
+
+  const validateStep3 = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else {
@@ -103,54 +118,64 @@ export default function RegisterPage() {
         newErrors.password = 'Password does not meet requirements';
       }
     }
-    
+
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-    
+
     if (!formData.agreeTerms) {
       newErrors.agreeTerms = 'You must agree to the terms';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  
+
   const handleContinue = () => {
     if (!registrationEnabled) return;
     if (step === 1 && validateStep1()) {
       setStep(2);
+    } else if (step === 2 && validateStep2()) {
+      setStep(3);
     }
   };
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registrationEnabled) return;
-    
-    if (!validateStep2()) return;
-    
+    if (!validateStep3()) return;
+
     setIsLoading(true);
-    
     try {
       await register({
         email: formData.email.trim(),
         username: formData.username.trim(),
         password: formData.password,
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        phone: formData.phone.trim(),
       });
       router.push('/auth/verify-email');
-    } catch (err: any) {
+    } catch (err: unknown) {
       const msg = err instanceof ApiError ? err.detail : 'Registration failed. Please try again.';
       setErrors({ form: msg });
     } finally {
       setIsLoading(false);
     }
   };
-  
+
+  const stepTitles = [
+    { title: 'Personal information', subtitle: 'Tell us about yourself' },
+    { title: 'Account details', subtitle: 'Set up your login credentials' },
+    { title: 'Set your password', subtitle: 'Choose a strong password to secure your account' },
+  ];
+
+  const current = stepTitles[step - 1];
+
   return (
     <div>
-      {/* Mobile logo */}
       <div className="lg:hidden mb-8 text-center">
         <Link href="/" className="inline-flex items-center">
           <Image
@@ -164,8 +189,7 @@ export default function RegisterPage() {
           />
         </Link>
       </div>
-      
-      {/* Registration disabled banner */}
+
       {!registrationEnabled && (
         <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
@@ -176,7 +200,6 @@ export default function RegisterPage() {
         </div>
       )}
 
-      {/* Backend error banner */}
       {errors.form && (
         <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
           {errors.form}
@@ -185,28 +208,77 @@ export default function RegisterPage() {
 
       {/* Progress indicator */}
       <div className="flex items-center gap-2 mb-8">
-        <div className="flex-1 h-1 rounded-full bg-brand-500" />
-        <div className={cn(
-          'flex-1 h-1 rounded-full transition-colors',
-          step >= 2 ? 'bg-brand-500' : 'bg-surface-100'
-        )} />
+        {[1, 2, 3].map(s => (
+          <div key={s} className={cn(
+            'flex-1 h-1 rounded-full transition-colors',
+            step >= s ? 'bg-brand-500' : 'bg-surface-100'
+          )} />
+        ))}
       </div>
-      
-      {/* Header */}
+
       <div className="mb-8">
-        <h2 className="text-2xl font-display font-bold text-white mb-2">
-          {step === 1 ? 'Create your account' : 'Set your password'}
-        </h2>
-        <p className="text-gray-400">
-          {step === 1
-            ? 'Start trading in under 5 minutes'
-            : 'Choose a strong password to secure your account'}
-        </p>
+        <h2 className="text-2xl font-display font-bold text-white mb-2">{current.title}</h2>
+        <p className="text-gray-400">{current.subtitle}</p>
       </div>
-      
-      {/* Form */}
+
       <form onSubmit={handleSubmit} className="space-y-5">
-        {step === 1 ? (
+        {step === 1 && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                ref={firstNameRef}
+                label="First Name"
+                name="firstName"
+                type="text"
+                placeholder="John"
+                value={formData.firstName}
+                onChange={handleChange}
+                error={errors.firstName}
+                leftIcon={<UserCircle className="w-4 h-4" />}
+                autoComplete="given-name"
+                maxLength={100}
+              />
+              <Input
+                label="Last Name"
+                name="lastName"
+                type="text"
+                placeholder="Doe"
+                value={formData.lastName}
+                onChange={handleChange}
+                error={errors.lastName}
+                leftIcon={<UserCircle className="w-4 h-4" />}
+                autoComplete="family-name"
+                maxLength={100}
+              />
+            </div>
+
+            <Input
+              label="Phone Number"
+              name="phone"
+              type="tel"
+              placeholder="+90 555 123 4567"
+              value={formData.phone}
+              onChange={handleChange}
+              error={errors.phone}
+              leftIcon={<Phone className="w-4 h-4" />}
+              autoComplete="tel"
+              maxLength={20}
+            />
+
+            <Button
+              type="button"
+              fullWidth
+              size="lg"
+              onClick={handleContinue}
+              icon={<ArrowRight className="w-5 h-5" />}
+              iconPosition="right"
+            >
+              Continue
+            </Button>
+          </>
+        )}
+
+        {step === 2 && (
           <>
             <Input
               ref={emailRef}
@@ -221,7 +293,7 @@ export default function RegisterPage() {
               autoComplete="email"
               maxLength={254}
             />
-            
+
             <Input
               label="Username"
               name="username"
@@ -234,19 +306,26 @@ export default function RegisterPage() {
               hint="This will be your public display name"
               autoComplete="username"
             />
-            
-            <Button
-              type="button"
-              fullWidth
-              size="lg"
-              onClick={handleContinue}
-              icon={<ArrowRight className="w-5 h-5" />}
-              iconPosition="right"
-            >
-              Continue
-            </Button>
+
+            <div className="flex gap-3">
+              <Button type="button" variant="secondary" size="lg" onClick={() => setStep(1)}>
+                Back
+              </Button>
+              <Button
+                type="button"
+                fullWidth
+                size="lg"
+                onClick={handleContinue}
+                icon={<ArrowRight className="w-5 h-5" />}
+                iconPosition="right"
+              >
+                Continue
+              </Button>
+            </div>
           </>
-        ) : (
+        )}
+
+        {step === 3 && (
           <>
             <div>
               <Input
@@ -262,8 +341,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 maxLength={128}
               />
-              
-              {/* Password strength indicator */}
+
               {formData.password && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -280,11 +358,7 @@ export default function RegisterPage() {
                           passed ? 'text-green-400' : 'text-gray-500'
                         )}
                       >
-                        {passed ? (
-                          <Check className="w-3 h-3" />
-                        ) : (
-                          <X className="w-3 h-3" />
-                        )}
+                        {passed ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
                         {req.label}
                       </div>
                     );
@@ -292,7 +366,7 @@ export default function RegisterPage() {
                 </motion.div>
               )}
             </div>
-            
+
             <Input
               label="Confirm Password"
               name="confirmPassword"
@@ -304,8 +378,7 @@ export default function RegisterPage() {
               leftIcon={<Lock className="w-4 h-4" />}
               autoComplete="new-password"
             />
-            
-            {/* Terms checkbox */}
+
             <label className={cn(
               'flex items-start gap-3 cursor-pointer',
               errors.agreeTerms && 'text-red-400'
@@ -319,23 +392,14 @@ export default function RegisterPage() {
               />
               <span className="text-sm text-gray-400">
                 I agree to the{' '}
-                <Link href="/terms" className="text-brand-400 hover:underline">
-                  Terms of Service
-                </Link>{' '}
+                <Link href="/terms" className="text-brand-400 hover:underline">Terms of Service</Link>{' '}
                 and{' '}
-                <Link href="/privacy" className="text-brand-400 hover:underline">
-                  Privacy Policy
-                </Link>
+                <Link href="/privacy" className="text-brand-400 hover:underline">Privacy Policy</Link>
               </span>
             </label>
-            
+
             <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                size="lg"
-                onClick={() => setStep(1)}
-              >
+              <Button type="button" variant="secondary" size="lg" onClick={() => setStep(2)}>
                 Back
               </Button>
               <Button
@@ -352,19 +416,14 @@ export default function RegisterPage() {
           </>
         )}
       </form>
-      
-      {/* Login link */}
+
       <p className="mt-8 text-center text-sm text-gray-400">
         Already have an account?{' '}
-        <Link
-          href="/auth/login"
-          className="text-brand-400 hover:text-brand-300 font-medium transition-colors"
-        >
+        <Link href="/auth/login" className="text-brand-400 hover:text-brand-300 font-medium transition-colors">
           Sign in
         </Link>
       </p>
-      
-      {/* Referral notice */}
+
       {step === 1 && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -373,11 +432,10 @@ export default function RegisterPage() {
           className="mt-8 p-4 rounded-lg bg-brand-500/10 border border-brand-500/20"
         >
           <p className="text-sm text-brand-400">
-            🎁 New users get <span className="font-semibold">10% off trading fees</span> for the first 30 days!
+            New users get <span className="font-semibold">10% off trading fees</span> for the first 30 days!
           </p>
         </motion.div>
       )}
     </div>
   );
 }
-

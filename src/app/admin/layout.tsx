@@ -13,6 +13,7 @@ import {
   FileText,
   BarChart3,
   Megaphone,
+  ScanFace,
   Flag,
   ScrollText,
   LogOut,
@@ -46,6 +47,7 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: 'Operations',
     items: [
       { name: 'Users', href: '/admin/users', icon: Users, permission: 'canManageUsers' },
+      { name: 'KYC Requests', href: '/admin/kyc', icon: ScanFace, permission: 'canManageUsers' },
       { name: 'Balances', href: '/admin/balances', icon: Wallet, permission: 'canManageBalances' },
       { name: 'Orders & Trades', href: '/admin/orders', icon: ArrowLeftRight, permission: 'canManageOrders' },
       { name: 'Wallets', href: '/admin/wallets', icon: CreditCard, permission: 'canManageWallets' },

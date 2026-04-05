@@ -160,7 +160,7 @@ function VerifyEmailCodeContent() {
     try {
       await authApi.verifyEmailCode(code);
       setStatus('success');
-      setTimeout(() => router.push('/dashboard'), 1500);
+      setTimeout(() => router.push('/kyc'), 1500);
     } catch (err) {
       setStatus('error');
       setError(err instanceof ApiError ? err.detail : 'Verification failed. Please try again.');
@@ -192,7 +192,7 @@ function VerifyEmailCodeContent() {
           <CheckCircle className="w-8 h-8 text-green-400" />
         </div>
         <h2 className="text-2xl font-display font-bold text-white mb-2">Email Verified!</h2>
-        <p className="text-gray-400 mb-4">Redirecting to dashboard...</p>
+        <p className="text-gray-400 mb-4">Redirecting to identity verification...</p>
         <Loader2 className="w-5 h-5 text-brand-400 animate-spin mx-auto" />
       </div>
     );
