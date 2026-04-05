@@ -16,6 +16,9 @@ import {
   AlertTriangle,
   Monitor,
   Lock,
+  ScanFace,
+  Clock,
+  ArrowRight,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { Card, CardHeader, Button, Input, Badge, Modal } from '@/components/ui';
@@ -172,7 +175,7 @@ function SecuritySettings() {
     <>
       <Card>
         <CardHeader title="Security Overview" subtitle="Review your account security status" />
-        <div className="grid sm:grid-cols-3 gap-4 mt-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
           <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
             <div className="flex items-center gap-2 mb-2">
               <Check className="w-4 h-4 text-green-400" />
@@ -203,10 +206,13 @@ function SecuritySettings() {
             </div>
             <p className="text-xs text-gray-400">Email verified</p>
           </div>
+          <KYCStatusCard />
         </div>
       </Card>
 
       <TwoFactorCard />
+
+      <KYCVerificationCard />
 
       <Card>
         <CardHeader title="Change Password" subtitle="Update your password regularly for better security" />
@@ -553,6 +559,99 @@ function AppearanceSettings() {
             </div>
           </div>
         </div>
+      </div>
+    </Card>
+  );
+}
+
+function KYCStatusCard() {
+  const user = useAuthStore((s) => s.user);
+  const status = user?.kycStatus || 'none';
+
+  const config: Record<string, { color: string; bg: string; border: string; label: string; icon: React.ElementType }> = {
+    none: { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: 'Not Started', icon: AlertTriangle },
+    pending: { color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', label: 'Pending', icon: Clock },
+    approved: { color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', label: 'Verified', icon: Check },
+    rejected: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', label: 'Rejected', icon: AlertTriangle },
+  };
+
+  const cfg = config[status] || config.none;
+
+  return (
+    <a href="/kyc" className={cn('block p-4 rounded-xl border transition-all hover:opacity-80', cfg.bg, cfg.border)}>
+      <div className="flex items-center gap-2 mb-2">
+        <cfg.icon className={cn('w-4 h-4', cfg.color)} />
+        <span className={cn('text-sm font-medium', cfg.color)}>{cfg.label}</span>
+      </div>
+      <p className="text-xs text-gray-400">Identity (KYC)</p>
+    </a>
+  );
+}
+
+function KYCVerificationCard() {
+  const user = useAuthStore((s) => s.user);
+  const status = user?.kycStatus || 'none';
+
+  return (
+    <Card>
+      <CardHeader
+        title="Identity Verification (KYC)"
+        subtitle="Verify your identity to enable trading and withdrawals"
+      />
+      <div className="mt-4">
+        {status === 'approved' ? (
+          <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-3">
+            <Check className="w-5 h-5 text-green-400" />
+            <div>
+              <p className="text-sm font-medium text-green-400">Identity Verified</p>
+              <p className="text-xs text-gray-400 mt-0.5">Your identity has been verified. All features are enabled.</p>
+            </div>
+          </div>
+        ) : status === 'pending' ? (
+          <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center gap-3">
+            <Clock className="w-5 h-5 text-blue-400" />
+            <div>
+              <p className="text-sm font-medium text-blue-400">Verification Pending</p>
+              <p className="text-xs text-gray-400 mt-0.5">Your documents are being reviewed. This usually takes up to 24 hours.</p>
+            </div>
+          </div>
+        ) : status === 'rejected' ? (
+          <div className="space-y-3">
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+              <div>
+                <p className="text-sm font-medium text-red-400">Verification Rejected</p>
+                <p className="text-xs text-gray-400 mt-0.5">Your documents were not accepted. Please resubmit with clear, valid photos.</p>
+              </div>
+            </div>
+            <a
+              href="/kyc"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-white text-sm font-medium transition-colors"
+            >
+              <ScanFace className="w-4 h-4" />
+              Resubmit Documents
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-400">Verification Required</p>
+                <p className="text-xs text-gray-400 mt-0.5">Trading and withdrawals are disabled until you verify your identity. Upload your government-issued ID to get started.</p>
+              </div>
+            </div>
+            <a
+              href="/kyc"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-white text-sm font-medium transition-colors"
+            >
+              <ScanFace className="w-4 h-4" />
+              Verify Identity
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        )}
       </div>
     </Card>
   );
