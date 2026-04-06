@@ -881,7 +881,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1">
                                 <Info className="w-3 h-3 text-yellow-500/70" />
-                                <span className="text-[11px] text-gray-400">Deposit Fee ({rateInfo.deposit_fee_percent}%)</span>
+                                <span className="text-[11px] text-gray-400">P2P Commission ({rateInfo.deposit_fee_percent}%)</span>
                               </div>
                               <span className="text-xs text-yellow-400">
                                 -{rateInfo.deposit_fee_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {rateInfo.target_currency}
