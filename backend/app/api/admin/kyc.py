@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import select, func as sa_func
+from sqlalchemy import select, func as sa_func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -47,7 +47,7 @@ async def list_kyc_requests(
         select(User)
         .where(*conditions)
         .order_by(
-            sa_func.case(
+            case(
                 (User.kyc_status == "pending", 0),
                 (User.kyc_status == "rejected", 1),
                 else_=2,

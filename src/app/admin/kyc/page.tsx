@@ -37,15 +37,18 @@ export default function AdminKYCPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await adminKYCApi.list({ status: tab, limit: 50 });
       setRequests(data.requests);
       setTotal(data.total);
-    } catch {
+    } catch (err: unknown) {
       setRequests([]);
+      setFetchError(err instanceof Error ? err.message : 'Failed to load KYC requests');
     } finally {
       setLoading(false);
     }
@@ -132,6 +135,12 @@ export default function AdminKYCPage() {
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="w-6 h-6 text-gray-600 animate-spin" />
+        </div>
+      ) : fetchError ? (
+        <div className="text-center py-12 space-y-2">
+          <AlertTriangle className="w-5 h-5 text-red-400 mx-auto" />
+          <p className="text-sm text-red-400">{fetchError}</p>
+          <button onClick={fetchRequests} className="text-xs text-gray-500 hover:text-white underline">Retry</button>
         </div>
       ) : requests.length === 0 ? (
         <div className="text-center py-12 text-sm text-gray-600">
