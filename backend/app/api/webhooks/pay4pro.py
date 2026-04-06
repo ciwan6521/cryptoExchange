@@ -194,6 +194,7 @@ async def _handle_deposit_confirmed(
     credit_amount = amount
     if deposit.expected_net_amount and deposit.expected_net_amount > Decimal("0"):
         credit_amount = min(deposit.expected_net_amount, amount)
+        deposit.amount = credit_amount
         logger.info(
             "Deposit fee applied: p4p_amount=%s expected_net=%s credit=%s fee_pct=%s",
             amount, deposit.expected_net_amount, credit_amount, deposit.deposit_fee_percent,
