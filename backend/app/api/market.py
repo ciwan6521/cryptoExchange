@@ -154,7 +154,7 @@ async def get_payment_method_rate(
         raise HTTPException(status_code=exc.status_code or 502, detail=exc.message)
 
     base_rate = Decimal(str(data.get("base_rate", 0)))
-    markup_pct = Decimal(str(data.get("markup_percent", 0)))
+    markup_pct = Decimal(str(data.get("financier_commission_percent", 0) or data.get("markup_percent", 0)))
     display_rate = base_rate * (1 + ADMIN_FEE_PERCENT / 100) if base_rate > 0 else Decimal(0)
 
     result = {

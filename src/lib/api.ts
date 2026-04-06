@@ -573,7 +573,8 @@ export interface MethodRateInfo {
   currency: string;
   target_currency: string;
   base_rate: number;
-  markup_percent: number;
+  markup_percent?: number;
+  financier_commission_percent?: number;
   effective_rate: number;
   amount?: number;
   converted_amount?: number;

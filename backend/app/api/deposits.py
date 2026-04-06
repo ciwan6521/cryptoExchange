@@ -221,7 +221,7 @@ async def claim_deposit(
                 body.payment_method_id, amount=float(amount),
             )
             base_rate = Decimal(str(rate_info.get("base_rate", 0)))
-            markup_pct = Decimal(str(rate_info.get("markup_percent", 0)))
+            markup_pct = Decimal(str(rate_info.get("financier_commission_percent", 0) or rate_info.get("markup_percent", 0)))
             if base_rate > 0:
                 admin_fee = Decimal("1")
                 display_rate = base_rate * (1 + admin_fee / 100)
