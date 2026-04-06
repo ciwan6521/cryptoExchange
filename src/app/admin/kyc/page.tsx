@@ -339,7 +339,7 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
 
 function DocCard({ doc, onPreview }: { doc: KYCDocItem; onPreview: () => void }) {
   const cfg = STATUS_CONFIG[doc.status] || STATUS_CONFIG.pending;
-  const typeLabel = doc.document_type === 'id_front' ? 'ID Front' : doc.document_type === 'id_back' ? 'ID Back' : doc.document_type;
+  const typeLabel = doc.document_type === 'id_front' ? 'ID Front' : doc.document_type === 'id_back' ? 'ID Back' : doc.document_type === 'proof_of_address' ? 'Proof of Address' : doc.document_type;
 
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">

@@ -23,7 +23,8 @@ router = APIRouter(prefix="/api/kyc", tags=["kyc"])
 UPLOAD_DIR = "/app/uploads/kyc"
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/jpg"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
-VALID_DOC_TYPES = {"id_front", "id_back"}
+VALID_DOC_TYPES = {"id_front", "id_back", "proof_of_address"}
+REQUIRED_DOC_TYPES = {"id_front", "id_back", "proof_of_address"}
 
 
 def _ensure_upload_dir():
@@ -90,8 +91,8 @@ async def upload_kyc_document(
         )
         db.add(doc)
 
-    both_uploaded = await _check_both_uploaded(user.id, db, exclude_type=document_type)
-    if both_uploaded or document_type == "id_back":
+    all_uploaded = await _check_all_required_uploaded(user.id, db, just_uploaded=document_type)
+    if all_uploaded:
         user.kyc_status = "pending"
 
     await db.commit()
@@ -106,15 +107,14 @@ async def upload_kyc_document(
     }
 
 
-async def _check_both_uploaded(user_id: uuid.UUID, db: AsyncSession, exclude_type: str) -> bool:
+async def _check_all_required_uploaded(user_id: uuid.UUID, db: AsyncSession, just_uploaded: str) -> bool:
+    """Check if all required document types have been uploaded (including the one just uploaded)."""
     result = await db.execute(
-        select(KYCDocument).where(
-            KYCDocument.user_id == user_id,
-            KYCDocument.document_type != exclude_type,
-        )
+        select(KYCDocument.document_type).where(KYCDocument.user_id == user_id)
     )
-    other = result.scalar_one_or_none()
-    return other is not None
+    uploaded_types = set(result.scalars().all())
+    uploaded_types.add(just_uploaded)
+    return REQUIRED_DOC_TYPES.issubset(uploaded_types)
 
 
 @router.get("/status")

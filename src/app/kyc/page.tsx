@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Camera,
   CreditCard,
+  FileText,
   Loader2,
   AlertTriangle,
   RefreshCw,
@@ -47,12 +48,14 @@ export default function KYCPage() {
 
   const [idFront, setIdFront] = useState<DocSlot>({ ...initialSlot });
   const [idBack, setIdBack] = useState<DocSlot>({ ...initialSlot });
+  const [proofAddr, setProofAddr] = useState<DocSlot>({ ...initialSlot });
   const [kycStatus, setKycStatus] = useState<string>('none');
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const frontRef = useRef<HTMLInputElement>(null);
   const backRef = useRef<HTMLInputElement>(null);
+  const proofRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user?.kycStatus === 'approved') {
@@ -74,8 +77,10 @@ export default function KYCPage() {
             setIdFront(prev => ({ ...prev, ...slot }));
           } else if (doc.document_type === 'id_back') {
             setIdBack(prev => ({ ...prev, ...slot }));
-            if (doc.rejection_reason) setRejectionReason(doc.rejection_reason);
+          } else if (doc.document_type === 'proof_of_address') {
+            setProofAddr(prev => ({ ...prev, ...slot }));
           }
+          if (doc.rejection_reason) setRejectionReason(doc.rejection_reason);
         }
       } catch {
         // first time — no docs yet
@@ -86,34 +91,36 @@ export default function KYCPage() {
     fetchStatus();
   }, [user, router]);
 
+  const slotSetters: Record<string, React.Dispatch<React.SetStateAction<DocSlot>>> = {
+    id_front: setIdFront,
+    id_back: setIdBack,
+    proof_of_address: setProofAddr,
+  };
+
   const handleFileSelect = useCallback(
-    (type: 'id_front' | 'id_back') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    (type: 'id_front' | 'id_back' | 'proof_of_address') => (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      const setter = slotSetters[type];
 
       if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
-        const err = 'Only JPEG/PNG images are accepted';
-        if (type === 'id_front') setIdFront(prev => ({ ...prev, error: err }));
-        else setIdBack(prev => ({ ...prev, error: err }));
+        setter(prev => ({ ...prev, error: 'Only JPEG/PNG images are accepted' }));
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        const err = 'File size must be less than 5 MB';
-        if (type === 'id_front') setIdFront(prev => ({ ...prev, error: err }));
-        else setIdBack(prev => ({ ...prev, error: err }));
+        setter(prev => ({ ...prev, error: 'File size must be less than 5 MB' }));
         return;
       }
 
       const preview = URL.createObjectURL(file);
-      const update: DocSlot = { file, preview, uploading: false, uploaded: false, error: null, serverStatus: null };
-      if (type === 'id_front') setIdFront(update);
-      else setIdBack(update);
+      setter({ file, preview, uploading: false, uploaded: false, error: null, serverStatus: null });
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
   const handleDrop = useCallback(
-    (type: 'id_front' | 'id_back') => (e: React.DragEvent) => {
+    (type: 'id_front' | 'id_back' | 'proof_of_address') => (e: React.DragEvent) => {
       e.preventDefault();
       const file = e.dataTransfer.files?.[0];
       if (!file) return;
@@ -135,28 +142,34 @@ export default function KYCPage() {
       setIdBack(prev => ({ ...prev, error: 'Please upload the back of your ID' }));
       return;
     }
+    if (!proofAddr.file && !proofAddr.uploaded) {
+      setProofAddr(prev => ({ ...prev, error: 'Please upload a proof of address document' }));
+      return;
+    }
 
     setSubmitting(true);
 
-    try {
-      if (idFront.file) {
-        setIdFront(prev => ({ ...prev, uploading: true, error: null }));
-        await kycApi.upload('id_front', idFront.file);
-        setIdFront(prev => ({ ...prev, uploading: false, uploaded: true, serverStatus: 'pending' }));
-      }
+    const uploads: { type: string; slot: DocSlot; setter: React.Dispatch<React.SetStateAction<DocSlot>> }[] = [
+      { type: 'id_front', slot: idFront, setter: setIdFront },
+      { type: 'id_back', slot: idBack, setter: setIdBack },
+      { type: 'proof_of_address', slot: proofAddr, setter: setProofAddr },
+    ];
 
-      if (idBack.file) {
-        setIdBack(prev => ({ ...prev, uploading: true, error: null }));
-        await kycApi.upload('id_back', idBack.file);
-        setIdBack(prev => ({ ...prev, uploading: false, uploaded: true, serverStatus: 'pending' }));
+    try {
+      for (const { type, slot, setter } of uploads) {
+        if (slot.file) {
+          setter(prev => ({ ...prev, uploading: true, error: null }));
+          await kycApi.upload(type, slot.file);
+          setter(prev => ({ ...prev, uploading: false, uploaded: true, serverStatus: 'pending' }));
+        }
       }
 
       setKycStatus('pending');
       await restoreSession();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
-      if (!idFront.uploaded) setIdFront(prev => ({ ...prev, uploading: false, error: msg }));
-      else setIdBack(prev => ({ ...prev, uploading: false, error: msg }));
+      const failedUpload = uploads.find(u => u.slot.file && !u.slot.uploaded);
+      if (failedUpload) failedUpload.setter(prev => ({ ...prev, uploading: false, error: msg }));
     } finally {
       setSubmitting(false);
     }
@@ -217,7 +230,7 @@ export default function KYCPage() {
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Identity Verification</h1>
           <p className="text-gray-400">
-            Upload your government-issued ID to verify your identity
+            Upload your government-issued ID and a proof of address document
           </p>
         </div>
 
@@ -254,6 +267,17 @@ export default function KYCPage() {
             onFileSelect={handleFileSelect('id_back')}
             onDrop={handleDrop('id_back')}
             onClickUpload={() => backRef.current?.click()}
+          />
+
+          <UploadSlot
+            label="Proof of Address"
+            description="Utility bill, bank statement or residence certificate"
+            icon={<FileText className="w-6 h-6" />}
+            slot={proofAddr}
+            inputRef={proofRef}
+            onFileSelect={handleFileSelect('proof_of_address')}
+            onDrop={handleDrop('proof_of_address')}
+            onClickUpload={() => proofRef.current?.click()}
           />
         </div>
 
