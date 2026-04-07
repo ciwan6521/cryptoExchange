@@ -46,6 +46,7 @@ class UserResponse(BaseModel):
     trading_enabled: bool
     withdrawals_enabled: bool
     totp_enabled: bool
+    deposit_cooldown_until: Optional[str] = None
     created_at: str
 
     class Config:

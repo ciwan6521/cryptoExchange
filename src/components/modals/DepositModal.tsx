@@ -111,7 +111,7 @@ const CHAIN_CONFIRMATIONS: Record<string, { blocks: number; time: string }> = {
 };
 
 export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
-  const { user } = useAuthStore();
+  const { user, restoreSession } = useAuthStore();
 
   const [chains, setChains] = useState<ChainInfo[]>([]);
   const [selectedChain, setSelectedChain] = useState<string>('bsc');
@@ -141,6 +141,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [claimSuccess, setClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState('');
+  const [cooldownUntil, setCooldownUntil] = useState<string | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   const [rateInfo, setRateInfo] = useState<MethodRateInfo | null>(null);
   const [rateLoading, setRateLoading] = useState(false);
@@ -327,6 +329,36 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     return () => { rateCancelRef.current = true; if (rateTimerRef.current) { clearTimeout(rateTimerRef.current); rateTimerRef.current = null; } };
   }, [claimAmount, selectedMethod]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Initialize cooldown from auth store on mount
+  useEffect(() => {
+    if (!isOpen) return;
+    const cd = user?.depositCooldownUntil;
+    if (cd) {
+      const remaining = Math.max(0, Math.floor((new Date(cd).getTime() - Date.now()) / 1000));
+      if (remaining > 0) {
+        setCooldownUntil(cd);
+        setCooldownSeconds(remaining);
+        setClaimSuccess(true);
+      }
+    }
+  }, [isOpen, user?.depositCooldownUntil]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.floor((new Date(cooldownUntil).getTime() - Date.now()) / 1000));
+      setCooldownSeconds(remaining);
+      if (remaining <= 0) {
+        setCooldownUntil(null);
+        setClaimSuccess(false);
+      }
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [cooldownUntil]);
+
   if (!isOpen) return null;
 
   const chainConf = CHAIN_CONFIRMATIONS[selectedChain] || { blocks: 15, time: '~2 min' };
@@ -338,6 +370,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     setClaimError('');
     setRateInfo(null);
     setRateError('');
+    setCooldownUntil(null);
+    setCooldownSeconds(0);
   };
 
   const handleContinueToAddress = () => {
@@ -360,13 +394,17 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     setClaimSubmitting(true);
     setClaimError('');
     try {
-      await depositApi.claimDeposit({
+      const res = await depositApi.claimDeposit({
         amount: claimAmount,
         currency: method.currency || 'USDT',
         method: method.type,
         payment_method_id: method.id,
       });
       setClaimSuccess(true);
+      if (res.cooldown_until) {
+        setCooldownUntil(res.cooldown_until);
+      }
+      restoreSession();
     } catch (err: unknown) {
       const apiErr = err as { detail?: string; message?: string };
       setClaimError(apiErr.detail || apiErr.message || 'Failed to submit claim');
@@ -794,19 +832,41 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
           {user && (
             claimSuccess ? (
-              <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
-                <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <p className="text-sm font-medium text-green-400 mb-1">Deposit Claim Submitted</p>
-                <p className="text-xs text-green-300/70">
-                  Your deposit of {claimAmount} {selectedMethod.currency || 'USDT'} is pending admin verification.
-                  You will be credited once confirmed.
+              <div className="py-6 text-center">
+                <div className="relative w-28 h-28 mx-auto mb-5">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 112 112">
+                    <circle cx="56" cy="56" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                    <circle
+                      cx="56" cy="56" r="50" fill="none"
+                      stroke="url(#cooldown-grad)"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 50}
+                      strokeDashoffset={2 * Math.PI * 50 * (1 - cooldownSeconds / 900)}
+                      className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+                    />
+                    <defs>
+                      <linearGradient id="cooldown-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#22c55e" />
+                        <stop offset="100%" stopColor="#06b6d4" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-white font-mono tracking-wider">
+                      {String(Math.floor(cooldownSeconds / 60)).padStart(2, '0')}:{String(cooldownSeconds % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 rounded-full animate-ping opacity-10 bg-green-400 pointer-events-none" style={{ animationDuration: '2s' }} />
+                </div>
+                <p className="text-base font-semibold text-white mb-1">Your deposit is being processed</p>
+                <p className="text-xs text-gray-400 leading-relaxed max-w-xs mx-auto">
+                  All transactions are temporarily paused during the processing period.
                 </p>
-                <button
-                  onClick={resetClaimForm}
-                  className="mt-3 px-4 py-1.5 text-xs text-brand-400 hover:text-brand-300 border border-brand-500/30 rounded-lg transition-colors"
-                >
-                  Submit Another
-                </button>
+                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                  <Clock className="w-3.5 h-3.5" />
+                  Deposits, withdrawals &amp; trading are paused
+                </div>
               </div>
             ) : (
               <div className="p-4 rounded-xl bg-surface-100 border border-glass-border space-y-3">

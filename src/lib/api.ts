@@ -101,6 +101,7 @@ export interface UserResponse {
   trading_enabled: boolean;
   withdrawals_enabled: boolean;
   totp_enabled: boolean;
+  deposit_cooldown_until: string | null;
   created_at: string;
 }
 
@@ -610,7 +611,7 @@ export const depositApi = {
     request<{ methods: PaymentMethod[] }>('/api/market/deposit-methods'),
 
   claimDeposit: (data: { amount: string; currency: string; method: string; payment_method_id?: string }) =>
-    request<{ ok: boolean; deposit: { id: string; amount: string; currency: string; method: string; status: string; transaction_id: string }; message: string }>(
+    request<{ ok: boolean; deposit: { id: string; amount: string; currency: string; method: string; status: string; transaction_id: string }; cooldown_until?: string; message: string }>(
       '/api/deposits/claim',
       { method: 'POST', body: JSON.stringify(data) },
     ),

@@ -9,6 +9,7 @@ User-facing deposit API routes.
 
 import uuid
 import logging
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -183,6 +184,14 @@ async def claim_deposit(
     User claims they have sent a deposit via bank transfer / papara / etc.
     Creates a deposit request on Pay4Pro and a local pending record.
     """
+    if user.deposit_cooldown_until and user.deposit_cooldown_until > datetime.now(timezone.utc):
+        remaining = int((user.deposit_cooldown_until - datetime.now(timezone.utc)).total_seconds())
+        raise HTTPException(
+            status_code=403,
+            detail=f"Deposit is being processed. Please wait {remaining} seconds.",
+            headers={"X-Cooldown-Remaining": str(remaining)},
+        )
+
     try:
         amount = Decimal(body.amount)
         if amount <= 0:
@@ -250,12 +259,16 @@ async def claim_deposit(
         **fee_kwargs,
     )
     db.add(deposit)
+
+    cooldown_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+    user.deposit_cooldown_until = cooldown_until
+
     await db.commit()
     await db.refresh(deposit)
 
     logger.info(
-        "Deposit claim created: user=%s amount=%s %s method=%s p4p_tx=%s",
-        user.id, amount, body.currency, body.method, tx_id,
+        "Deposit claim created: user=%s amount=%s %s method=%s p4p_tx=%s cooldown_until=%s",
+        user.id, amount, body.currency, body.method, tx_id, cooldown_until.isoformat(),
     )
 
     return {
@@ -268,5 +281,6 @@ async def claim_deposit(
             "status": deposit.status,
             "transaction_id": tx_id,
         },
+        "cooldown_until": cooldown_until.isoformat(),
         "message": "Deposit claim submitted. It will be credited after admin verification.",
     }

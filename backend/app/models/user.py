@@ -30,6 +30,9 @@ class User(Base):
     trading_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     withdrawals_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # Deposit cooldown (15min after claim)
+    deposit_cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # 2FA
     totp_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)

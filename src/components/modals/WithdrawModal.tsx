@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { X, Send, AlertTriangle, Loader2, ChevronDown, Check, Shield, Settings } from 'lucide-react';
+import { X, Send, AlertTriangle, Loader2, ChevronDown, Check, Shield, Settings, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useBalanceStore } from '@/stores/balance-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -109,6 +109,19 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
     setSubmitting(false);
   };
 
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  useEffect(() => {
+    const cd = user?.depositCooldownUntil;
+    if (!cd) { setCooldownSeconds(0); return; }
+    const tick = () => {
+      const rem = Math.max(0, Math.floor((new Date(cd).getTime() - Date.now()) / 1000));
+      setCooldownSeconds(rem);
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [user?.depositCooldownUntil]);
+
   const inputCls = 'w-full h-10 px-3 text-sm bg-surface-100 border border-glass-border rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/40 focus:ring-1 focus:ring-brand-500/20';
 
   return (
@@ -140,6 +153,30 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
             >
               Close
             </button>
+          </div>
+        ) : cooldownSeconds > 0 ? (
+          <div className="p-8 text-center">
+            <div className="relative w-24 h-24 mx-auto mb-4">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96">
+                <circle cx="48" cy="48" r="42" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+                <circle cx="48" cy="48" r="42" fill="none" stroke="#f59e0b" strokeWidth="5" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 42} strokeDashoffset={2 * Math.PI * 42 * (1 - cooldownSeconds / 900)}
+                  className="transition-[stroke-dashoffset] duration-1000 ease-linear" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xl font-bold text-white font-mono">
+                  {String(Math.floor(cooldownSeconds / 60)).padStart(2, '0')}:{String(cooldownSeconds % 60).padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+            <h3 className="text-base font-semibold text-white mb-2">Withdrawal Temporarily Paused</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              A deposit is currently being processed. Withdrawals will be available once the processing period ends.
+            </p>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+              <Clock className="w-3.5 h-3.5" />
+              Processing deposit
+            </div>
           </div>
         ) : !user?.totp_enabled ? (
           <div className="p-8 text-center">

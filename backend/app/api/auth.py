@@ -301,6 +301,7 @@ def _user_response(user: User) -> UserResponse:
         trading_enabled=user.trading_enabled,
         withdrawals_enabled=user.withdrawals_enabled,
         totp_enabled=user.totp_enabled,
+        deposit_cooldown_until=user.deposit_cooldown_until.isoformat() if user.deposit_cooldown_until else None,
         created_at=user.created_at.isoformat(),
     )
 

@@ -25,6 +25,7 @@ export interface AuthUser {
   tradingEnabled: boolean;
   withdrawalsEnabled: boolean;
   totp_enabled: boolean;
+  depositCooldownUntil: string | null;
   created_at: string;
 }
 
@@ -62,6 +63,7 @@ function mapUser(u: UserResponse): AuthUser {
     tradingEnabled: u.trading_enabled,
     withdrawalsEnabled: u.withdrawals_enabled,
     totp_enabled: u.totp_enabled,
+    depositCooldownUntil: u.deposit_cooldown_until ?? null,
     created_at: u.created_at,
   };
 }

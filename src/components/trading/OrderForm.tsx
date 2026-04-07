@@ -11,6 +11,7 @@ import { getPrecision } from '@/lib/tokens';
 import { isEnabled } from '@/lib/feature-flags';
 import { useTradingDisabled } from './ConnectionStatus';
 import { useAdminStore } from '@/stores/admin-store';
+import { useAuthStore } from '@/stores/auth-store';
 import { useUserFlags } from '@/hooks/useUserFlags';
 import { useOrderStore } from '@/stores/order-store';
 import { ApiError } from '@/lib/api';
@@ -62,6 +63,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const { tradingEnabled: adminTradingOn, newOrdersEnabled: adminNewOrdersOn } = useAdminStore((s) => s.systemFlags);
   const pairDisabled = false; // Pair-level disable comes from backend via market API
   const { userTradingEnabled } = useUserFlags();
+  const depositCooldownUntil = useAuthStore((s) => s.user?.depositCooldownUntil);
+  const isCooldownActive = Boolean(depositCooldownUntil && new Date(depositCooldownUntil).getTime() > Date.now());
   const stopLimitEnabled = isEnabled('ENABLE_STOP_LIMIT');
 
   // Build order type options based on feature flags
@@ -171,7 +174,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     }
   };
 
-  const isDisabled = !liveTradingEnabled || tradingDisabled || !adminTradingOn || !adminNewOrdersOn || pairDisabled || !userTradingEnabled;
+  const isDisabled = !liveTradingEnabled || tradingDisabled || !adminTradingOn || !adminNewOrdersOn || pairDisabled || !userTradingEnabled || isCooldownActive;
 
   return (
     <div className="h-full flex flex-col">
@@ -198,6 +201,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-400">
           <Lock className="w-3 h-3" />
           Trading for {symbol} is currently disabled
+        </div>
+      )}
+      {isCooldownActive && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-400">
+          <Lock className="w-3 h-3" />
+          Trading is paused while a deposit is being processed
         </div>
       )}
       {!userTradingEnabled && (

@@ -10,6 +10,7 @@ All order operations go through the MatchingEngine which ensures:
 import uuid
 import logging
 import traceback as tb_module
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -87,6 +88,14 @@ async def place_order(
         raise HTTPException(
             status_code=403,
             detail="KYC verification is required for trading. Please complete identity verification first.",
+        )
+
+    if user.deposit_cooldown_until and user.deposit_cooldown_until > datetime.now(timezone.utc):
+        remaining = int((user.deposit_cooldown_until - datetime.now(timezone.utc)).total_seconds())
+        raise HTTPException(
+            status_code=403,
+            detail=f"Deposit is being processed. Please wait {remaining} seconds.",
+            headers={"X-Cooldown-Remaining": str(remaining)},
         )
 
     try:
