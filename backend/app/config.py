@@ -40,7 +40,9 @@ class Settings(BaseSettings):
 
     # ── Pay4Pro Integration ──
     PAY4PRO_BASE_URL: str = ""
-    PAY4PRO_API_KEY: str = ""
+    PAY4PRO_API_KEY: str = ""  # legacy, kept for compat
+    PAY4PRO_PUBLIC_KEY: str = ""   # pk_xxx
+    PAY4PRO_SECRET_KEY: str = ""   # sk_xxx
     PAY4PRO_WEBHOOK_SECRET: str = ""
     PAY4PRO_DEFAULT_ASSET: str = "USDT"
     PAY4PRO_DEFAULT_NETWORK: str = "BSC"

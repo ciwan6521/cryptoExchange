@@ -88,12 +88,13 @@ class Pay4ProClient:
 
     def __init__(self):
         self.base_url = settings.PAY4PRO_BASE_URL.rstrip("/") if settings.PAY4PRO_BASE_URL else ""
-        self.api_key = settings.PAY4PRO_API_KEY
+        self.public_key = settings.PAY4PRO_PUBLIC_KEY
+        self.secret_key = settings.PAY4PRO_SECRET_KEY
         self.webhook_secret = settings.PAY4PRO_WEBHOOK_SECRET
 
     def _api_headers(self) -> dict:
         return {
-            "X-API-Key": self.api_key,
+            "x-api-key": f"{self.public_key}:{self.secret_key}",
             "Content-Type": "application/json",
         }
 

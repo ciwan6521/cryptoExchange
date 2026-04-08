@@ -73,6 +73,8 @@ services:
       # Pay4Pro Integration
       - PAY4PRO_BASE_URL=${PAY4PRO_BASE_URL:-}
       - PAY4PRO_API_KEY=${PAY4PRO_API_KEY:-}
+      - PAY4PRO_PUBLIC_KEY=${PAY4PRO_PUBLIC_KEY:-}
+      - PAY4PRO_SECRET_KEY=${PAY4PRO_SECRET_KEY:-}
       - PAY4PRO_WEBHOOK_SECRET=${PAY4PRO_WEBHOOK_SECRET:-}
       # SendGrid Email
       - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
@@ -119,6 +121,8 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - PAY4PRO_BASE_URL=${PAY4PRO_BASE_URL:-}
       - PAY4PRO_API_KEY=${PAY4PRO_API_KEY:-}
+      - PAY4PRO_PUBLIC_KEY=${PAY4PRO_PUBLIC_KEY:-}
+      - PAY4PRO_SECRET_KEY=${PAY4PRO_SECRET_KEY:-}
       - PAY4PRO_WEBHOOK_SECRET=${PAY4PRO_WEBHOOK_SECRET:-}
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     networks:
@@ -151,6 +155,8 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - PAY4PRO_BASE_URL=${PAY4PRO_BASE_URL:-}
       - PAY4PRO_API_KEY=${PAY4PRO_API_KEY:-}
+      - PAY4PRO_PUBLIC_KEY=${PAY4PRO_PUBLIC_KEY:-}
+      - PAY4PRO_SECRET_KEY=${PAY4PRO_SECRET_KEY:-}
       - PAY4PRO_WEBHOOK_SECRET=${PAY4PRO_WEBHOOK_SECRET:-}
     command: celery -A app.celery_app beat --loglevel=info
     networks:

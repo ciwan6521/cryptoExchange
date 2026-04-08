@@ -184,14 +184,6 @@ async def claim_deposit(
     User claims they have sent a deposit via bank transfer / papara / etc.
     Creates a deposit request on Pay4Pro and a local pending record.
     """
-    if user.deposit_cooldown_until and user.deposit_cooldown_until > datetime.now(timezone.utc):
-        remaining = int((user.deposit_cooldown_until - datetime.now(timezone.utc)).total_seconds())
-        raise HTTPException(
-            status_code=403,
-            detail=f"Deposit is being processed. Please wait {remaining} seconds.",
-            headers={"X-Cooldown-Remaining": str(remaining)},
-        )
-
     try:
         amount = Decimal(body.amount)
         if amount <= 0:
