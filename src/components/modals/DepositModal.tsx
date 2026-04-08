@@ -370,8 +370,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     setClaimError('');
     setRateInfo(null);
     setRateError('');
-    setCooldownUntil(null);
-    setCooldownSeconds(0);
   };
 
   const handleContinueToAddress = () => {
@@ -806,6 +804,48 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
           </div>
           <p className="text-sm text-gray-400">No fiat deposit methods available</p>
           <p className="text-xs text-gray-600 mt-1">Contact support for deposit instructions</p>
+        </div>
+      );
+    }
+
+    // Global cooldown — block all fiat deposit interactions
+    if (cooldownSeconds > 0) {
+      return (
+        <div className="py-6 text-center">
+          <div className="relative w-28 h-28 mx-auto mb-5">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 112 112">
+              <circle cx="56" cy="56" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+              <circle
+                cx="56" cy="56" r="50" fill="none"
+                stroke="url(#cooldown-grad-fiat)"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={2 * Math.PI * 50}
+                strokeDashoffset={2 * Math.PI * 50 * (1 - cooldownSeconds / 900)}
+                className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+              />
+              <defs>
+                <linearGradient id="cooldown-grad-fiat" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#22c55e" />
+                  <stop offset="100%" stopColor="#06b6d4" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl font-bold text-white font-mono tracking-wider">
+                {String(Math.floor(cooldownSeconds / 60)).padStart(2, '0')}:{String(cooldownSeconds % 60).padStart(2, '0')}
+              </span>
+            </div>
+            <div className="absolute inset-0 rounded-full animate-ping opacity-10 bg-green-400 pointer-events-none" style={{ animationDuration: '2s' }} />
+          </div>
+          <p className="text-base font-semibold text-white mb-1">Your deposit is being processed</p>
+          <p className="text-xs text-gray-400 leading-relaxed max-w-xs mx-auto">
+            All transactions are temporarily paused during the processing period.
+          </p>
+          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+            <Clock className="w-3.5 h-3.5" />
+            Deposits, withdrawals &amp; trading are paused
+          </div>
         </div>
       );
     }
