@@ -532,6 +532,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       const swift = (config.swift_code || config.swift || '') as string;
       const currency = (config.currency || m.currency || '') as string;
       const reference = (config.reference_note || config.reference || '') as string;
+      const descriptionNote = (config.description_note || (m as unknown as Record<string, unknown>).description_note || '') as string;
       const minDeposit = (config.min_deposit || '') as string;
 
       return (
@@ -570,6 +571,21 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             <div className="p-3 rounded-xl bg-surface-100 border border-glass-border">
               <label className="block text-[11px] text-gray-500 mb-1">Currency</label>
               <p className="text-sm text-white">{currency}</p>
+            </div>
+          )}
+          {descriptionNote && (
+            <div className="p-4 rounded-xl bg-amber-500/15 border-2 border-amber-500/30">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">Transfer Description (Required)</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-black/20 border border-amber-500/20">
+                <p className="text-sm font-bold text-white break-all">{descriptionNote}</p>
+                <CopyButton text={descriptionNote} id={m.id + '-desc'} />
+              </div>
+              <p className="text-[11px] text-amber-300/70 mt-2">
+                You must enter this text exactly in the transfer description field. Transfers without the correct description may not be processed.
+              </p>
             </div>
           )}
           {reference && (
