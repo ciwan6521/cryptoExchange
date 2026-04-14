@@ -388,6 +388,18 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       return;
     }
 
+    const minA = method.minAmount ? parseFloat(method.minAmount) : null;
+    const maxA = method.maxAmount ? parseFloat(method.maxAmount) : null;
+    const cur = method.currency || 'USDT';
+    if (minA != null && numAmount < minA) {
+      setClaimError(`Minimum amount is ${minA.toLocaleString()} ${cur}`);
+      return;
+    }
+    if (maxA != null && numAmount > maxA) {
+      setClaimError(`Maximum amount is ${maxA.toLocaleString()} ${cur}`);
+      return;
+    }
+
     setClaimSubmitting(true);
     setClaimError('');
     try {
@@ -880,7 +892,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                     <input
                       type="number"
                       step="any"
-                      min="0"
+                      min={selectedMethod.minAmount ? parseFloat(selectedMethod.minAmount) : 0}
+                      max={selectedMethod.maxAmount ? parseFloat(selectedMethod.maxAmount) : undefined}
                       value={claimAmount}
                       onChange={e => setClaimAmount(e.target.value)}
                       placeholder="0.00"
@@ -890,6 +903,17 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                       {selectedMethod.currency || 'USDT'}
                     </span>
                   </div>
+                  {(() => {
+                    const minA = selectedMethod.minAmount ? parseFloat(selectedMethod.minAmount) : null;
+                    const maxA = selectedMethod.maxAmount ? parseFloat(selectedMethod.maxAmount) : null;
+                    const cur = selectedMethod.currency || 'USDT';
+                    const parts = [
+                      minA != null ? `Min: ${minA.toLocaleString()} ${cur}` : null,
+                      maxA != null ? `Max: ${maxA.toLocaleString()} ${cur}` : null,
+                    ].filter(Boolean);
+                    if (parts.length === 0) return null;
+                    return <p className="text-[10px] text-gray-500 mt-1">{parts.join(' · ')}</p>;
+                  })()}
                 </div>
 
                 {/* Rate info panel */}
@@ -1031,6 +1055,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                 const iban = (m.config?.iban || m.config?.account_number || '') as string;
                 const maskedIban = iban ? `****${iban.slice(-4)}` : '';
                 const displayName = holder || m.name;
+                const cur = ((m.config?.currency as string) || m.currency || '').toUpperCase();
+                const minA = m.minAmount ? parseFloat(m.minAmount) : null;
+                const maxA = m.maxAmount ? parseFloat(m.maxAmount) : null;
+                const limitText = [
+                  minA != null ? `Min: ${minA.toLocaleString()} ${cur}` : null,
+                  maxA != null ? `Max: ${maxA.toLocaleString()} ${cur}` : null,
+                ].filter(Boolean).join(' · ');
                 return (
                   <button
                     key={m.id}
@@ -1048,6 +1079,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                       <div className="text-sm font-semibold text-white truncate">{displayName}</div>
                       {maskedIban && (
                         <div className="text-[11px] text-gray-500 mt-0.5 font-mono">{maskedIban}</div>
+                      )}
+                      {limitText && (
+                        <div className="text-[10px] text-gray-600 mt-0.5">{limitText}</div>
                       )}
                     </div>
                     <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />

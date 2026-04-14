@@ -566,6 +566,8 @@ export interface PaymentMethod {
   currency: string;
   country: string;
   is_active?: boolean;
+  minAmount?: string | null;
+  maxAmount?: string | null;
 }
 
 export interface MethodRateInfo {
