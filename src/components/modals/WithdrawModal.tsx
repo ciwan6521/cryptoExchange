@@ -26,6 +26,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   const currentChain = useMemo(
     () => chains.find(c => c.name === selectedChain),
@@ -69,6 +70,18 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
     }
   }, [availableTokens, asset]);
 
+  useEffect(() => {
+    const cd = user?.depositCooldownUntil;
+    if (!cd) { setCooldownSeconds(0); return; }
+    const tick = () => {
+      const rem = Math.max(0, Math.floor((new Date(cd).getTime() - Date.now()) / 1000));
+      setCooldownSeconds(rem);
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [user?.depositCooldownUntil]);
+
   if (!isOpen) return null;
 
   const selectedBalance = balances.find(b => b.asset === asset);
@@ -108,19 +121,6 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose })
     }
     setSubmitting(false);
   };
-
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  useEffect(() => {
-    const cd = user?.depositCooldownUntil;
-    if (!cd) { setCooldownSeconds(0); return; }
-    const tick = () => {
-      const rem = Math.max(0, Math.floor((new Date(cd).getTime() - Date.now()) / 1000));
-      setCooldownSeconds(rem);
-    };
-    tick();
-    const iv = setInterval(tick, 1000);
-    return () => clearInterval(iv);
-  }, [user?.depositCooldownUntil]);
 
   const inputCls = 'w-full h-10 px-3 text-sm bg-surface-100 border border-glass-border rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/40 focus:ring-1 focus:ring-brand-500/20';
 
