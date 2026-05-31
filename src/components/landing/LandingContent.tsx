@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { ArrowRight, Play } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Features, MarketTicker, Stats, CTA, FAQ } from '@/components/landing';
 import { Button, Skeleton } from '@/components/ui';
 import { isEnabled } from '@/lib/feature-flags';
@@ -71,6 +71,22 @@ export function LandingHero() {
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         >
           {/* Badge */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15, duration: 0.5 }}
+            className="mb-4"
+          >
+            <Link href="/ico/t4pro">
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-full hover:bg-amber-500/15 transition-colors cursor-pointer">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                </span>
+                T4PRO Token ICO — Join the sale
+              </span>
+            </Link>
+          </motion.div>
           {isEnabled('ENABLE_FUTURES') && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -112,13 +128,16 @@ export function LandingHero() {
                 Start Trading Now
               </Button>
             </Link>
-            <Button
-              variant="secondary"
-              size="lg"
-              icon={<Play className="w-4 h-4" />}
-            >
-              Watch Demo
-            </Button>
+            <Link href="/ico/t4pro">
+              <Button
+                variant="secondary"
+                size="lg"
+                icon={<ArrowRight className="w-5 h-5" />}
+                iconPosition="right"
+              >
+                T4PRO ICO
+              </Button>
+            </Link>
           </div>
 
           {/* Trust indicators */}

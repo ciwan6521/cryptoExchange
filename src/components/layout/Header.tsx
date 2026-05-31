@@ -17,6 +17,7 @@ import {
   ChevronDown,
   History,
   TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button, IconButton } from '@/components/ui';
@@ -37,6 +38,7 @@ const navigation = [
   { name: 'Trade', href: '/trade/BTC-USDT', icon: LineChart },
   ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures', icon: LineChart }] : []),
   { name: 'Earn', href: '/earn', icon: TrendingUp },
+  { name: 'T4PRO ICO', href: '/ico/t4pro', icon: Sparkles },
   { name: 'Wallet', href: '/wallet', icon: Wallet },
   { name: 'Rewards', href: '/rewards', icon: Gift },
 ];

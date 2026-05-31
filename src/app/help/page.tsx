@@ -11,6 +11,7 @@ export default function HelpPage() {
   const links = [
     { title: 'Trading Guide', desc: 'Spot trading, order types, and fees', href: '/fees', icon: FileText },
     { title: 'Futures / Leverage', desc: 'USDT-margined positions up to 100x', href: '/futures', icon: HelpCircle },
+    { title: 'T4PRO Token ICO', desc: 'Official token sale — join Telegram & social channels', href: '/ico/t4pro', icon: HelpCircle },
     { title: 'Staking (Earn)', desc: 'Lock coins for configured reward periods', href: '/earn', icon: Shield },
     { title: 'KYC Verification', desc: 'Required for trading, staking, and withdrawals', href: '/kyc', icon: Shield },
     { title: 'Contact Support', desc: 'support@crypto4pro.io', href: 'mailto:support@crypto4pro.io', icon: Mail },

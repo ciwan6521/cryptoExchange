@@ -16,6 +16,7 @@ import {
   Shield,
   TrendingUp,
   Gift,
+  Sparkles,
   History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ const mainNavigation = [
   ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures', icon: TrendingUp }] : []),
   { name: 'Wallet', href: '/wallet', icon: Wallet },
   { name: 'Earn', href: '/earn', icon: TrendingUp },
+  { name: 'T4PRO ICO', href: '/ico/t4pro', icon: Sparkles },
   { name: 'Rewards', href: '/rewards', icon: Gift },
   { name: 'Ledger', href: '/ledger', icon: History },
 ];

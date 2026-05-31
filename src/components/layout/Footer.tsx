@@ -18,6 +18,7 @@ const footerLinks = {
     { name: 'Spot Trading', href: '/trade/BTC-USDT' },
     ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures' }] : []),
     { name: 'Staking', href: '/earn' },
+    { name: 'T4PRO ICO', href: '/ico/t4pro' },
     { name: 'Markets', href: '/markets/spot' },
   ],
   company: [
