@@ -329,7 +329,7 @@ export default function FuturesPage() {
                     onClick={() => setMargin(usdtBalance.toFixed(2))}
                     className="text-xs text-brand-400 hover:text-brand-300"
                   >
-                    Max: {formatNumber(usdtBalance, 2)}
+                    Max: {formatNumber(usdtBalance, { decimals: 2 })}
                   </button>
                 )}
               </div>
@@ -349,11 +349,11 @@ export default function FuturesPage() {
               <div className="rounded-lg bg-surface-100 border border-glass-border p-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Notional</span>
-                  <span className="text-white tabular-nums">{formatNumber(parseFloat(preview.notional_usdt), 2)} USDT</span>
+                  <span className="text-white tabular-nums">{formatNumber(parseFloat(preview.notional_usdt), { decimals: 2 })} USDT</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Size</span>
-                  <span className="text-white tabular-nums">{formatNumber(parseFloat(preview.quantity), 6)} {baseAsset}</span>
+                  <span className="text-white tabular-nums">{formatNumber(parseFloat(preview.quantity), { decimals: 6 })} {baseAsset}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Liq. Price</span>
@@ -453,7 +453,7 @@ export default function FuturesPage() {
                             {pos.mark_price && pos.status === 'open' && (
                               <> · Mark {formatPrice(parseFloat(pos.mark_price))}</>
                             )}
-                            · Margin {formatNumber(parseFloat(pos.margin_usdt), 2)} USDT
+                            · Margin {formatNumber(parseFloat(pos.margin_usdt), { decimals: 2 })} USDT
                           </div>
                           {pos.status === 'open' && (
                             <div className="text-xs text-gray-500 mt-0.5">
@@ -466,7 +466,7 @@ export default function FuturesPage() {
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <div className={cn('font-semibold tabular-nums', isProfit ? 'text-profit' : 'text-loss')}>
-                            {isProfit ? '+' : ''}{formatNumber(pnl, 2)} USDT
+                            {isProfit ? '+' : ''}{formatNumber(pnl, { decimals: 2 })} USDT
                           </div>
                           {pos.roi_percent && pos.status === 'open' && (
                             <div className={cn('text-xs tabular-nums', isProfit ? 'text-profit' : 'text-loss')}>
