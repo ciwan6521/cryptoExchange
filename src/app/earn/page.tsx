@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, Lock, Sparkles, Clock, CheckCircle2, Loader2,
-  AlertTriangle, X, ChevronRight, Shield, Wallet,
+  AlertTriangle, X, Shield, Wallet,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { Button, CoinIcon } from '@/components/ui';
@@ -268,13 +268,12 @@ export default function EarnPage() {
                 {products.map((product, i) => {
                   const maxReturn = Math.max(...product.periods.map(p => parseFloat(p.reward_percent)));
                   return (
-                    <motion.button
+                    <motion.div
                       key={product.id}
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      onClick={() => openStake(product)}
-                      className="group text-left p-5 rounded-2xl bg-surface-100 border border-glass-border hover:border-brand-500/40 hover:bg-brand-500/[0.04] transition-all"
+                      className="group flex flex-col p-5 rounded-2xl bg-surface-100 border border-glass-border hover:border-brand-500/40 hover:bg-brand-500/[0.04] transition-all"
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
@@ -284,7 +283,6 @@ export default function EarnPage() {
                             <p className="text-xs text-gray-500">{product.asset}</p>
                           </div>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-brand-400 transition-colors" />
                       </div>
                       {product.description && (
                         <p className="text-xs text-gray-500 mb-4 line-clamp-2">{product.description}</p>
@@ -296,7 +294,7 @@ export default function EarnPage() {
                           </span>
                         ))}
                       </div>
-                      <div className="flex items-end justify-between pt-3 border-t border-white/[0.04]">
+                      <div className="flex items-end justify-between pt-3 border-t border-white/[0.04] mb-4">
                         <div>
                           <p className="text-[10px] text-gray-600 uppercase tracking-wide">Up to</p>
                           <p className="text-2xl font-bold text-brand-400">{maxReturn}%</p>
@@ -305,7 +303,14 @@ export default function EarnPage() {
                           <p className="text-[10px] text-gray-600">Min {parseFloat(product.min_stake).toLocaleString()} {product.asset}</p>
                         )}
                       </div>
-                    </motion.button>
+                      <Button
+                        fullWidth
+                        icon={<Lock className="w-4 h-4" />}
+                        onClick={() => openStake(product)}
+                      >
+                        Stake Now
+                      </Button>
+                    </motion.div>
                   );
                 })}
               </div>

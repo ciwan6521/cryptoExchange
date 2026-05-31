@@ -166,6 +166,11 @@ export default function DashboardPage() {
                       Trade
                     </Button>
                   </Link>
+                  <Link href="/earn">
+                    <Button variant="secondary" icon={<TrendingUp className="w-4 h-4" />}>
+                      Earn
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </Card>
