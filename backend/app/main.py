@@ -57,6 +57,7 @@ from app.api.admin.wallet import router as admin_wallet_router
 from app.api.admin.orders import router as admin_orders_router
 from app.api.admin.wallets_admin import router as admin_wallets_ops_router
 from app.api.admin.kyc import router as admin_kyc_router
+from app.api.admin.staking import router as admin_staking_router
 
 # User withdrawal + orders routers
 from app.api.withdrawals import router as withdrawal_router
@@ -70,6 +71,7 @@ from app.api.webhooks.pay4pro import router as pay4pro_webhook_router
 # User deposits + KYC
 from app.api.deposits import router as deposits_router
 from app.api.kyc import router as kyc_router
+from app.api.staking import router as staking_router
 from app.services.market_data import get_market_data_service
 
 
@@ -152,6 +154,7 @@ app.include_router(wallet_router)
 app.include_router(pay4pro_webhook_router)
 app.include_router(deposits_router)
 app.include_router(kyc_router)
+app.include_router(staking_router)
 
 # Register routers — Admin
 app.include_router(admin_auth_router)
@@ -167,6 +170,7 @@ app.include_router(admin_wallet_router)
 app.include_router(admin_orders_router)
 app.include_router(admin_wallets_ops_router)
 app.include_router(admin_kyc_router)
+app.include_router(admin_staking_router)
 
 
 @app.get("/api/health")

@@ -396,3 +396,78 @@ export const adminKYCApi = {
       { method: 'POST', body: JSON.stringify({ reason }) },
     ),
 };
+
+// ============================================
+// Admin Staking API
+// ============================================
+
+export interface AdminStakingPeriod {
+  id: string;
+  label: string;
+  duration_days: number;
+  reward_percent: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface AdminStakingProduct {
+  id: string;
+  asset: string;
+  name: string;
+  description: string | null;
+  min_stake: string | null;
+  is_active: boolean;
+  sort_order: number;
+  periods: AdminStakingPeriod[];
+  created_at: string;
+}
+
+export const adminStakingApi = {
+  listProducts: () =>
+    adminRequest<{ products: AdminStakingProduct[] }>('/api/admin/staking/products'),
+
+  createProduct: (data: {
+    asset: string;
+    name: string;
+    description?: string;
+    min_stake?: string;
+    is_active?: boolean;
+    sort_order?: number;
+    periods: Array<{
+      label: string;
+      duration_days: number;
+      reward_percent: string;
+      is_active?: boolean;
+      sort_order?: number;
+    }>;
+  }) =>
+    adminRequest<AdminStakingProduct>('/api/admin/staking/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateProduct: (id: string, data: Partial<{
+    asset: string;
+    name: string;
+    description: string;
+    min_stake: string;
+    is_active: boolean;
+    sort_order: number;
+    periods: Array<{
+      label: string;
+      duration_days: number;
+      reward_percent: string;
+      is_active?: boolean;
+      sort_order?: number;
+    }>;
+  }>) =>
+    adminRequest<AdminStakingProduct>(`/api/admin/staking/products/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deactivateProduct: (id: string) =>
+    adminRequest<{ ok: boolean }>(`/api/admin/staking/products/${id}`, {
+      method: 'DELETE',
+    }),
+};

@@ -7,6 +7,7 @@ from app.models.withdrawal_config import WithdrawalFeeConfig, HotWalletConfig
 from app.models.cms import CMSContent, SystemFlag, AuditLog
 from app.models.supported_asset import SupportedAsset
 from app.models.deposit_method import DepositMethod
+from app.models.staking import StakingProduct, StakingPeriod, StakingPosition
 
 __all__ = [
     "User", "UserSession", "AdminUser",
@@ -17,4 +18,5 @@ __all__ = [
     "CMSContent", "SystemFlag", "AuditLog",
     "SupportedAsset",
     "DepositMethod",
+    "StakingProduct", "StakingPeriod", "StakingPosition",
 ]

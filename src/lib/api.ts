@@ -627,6 +627,64 @@ export const depositApi = {
 };
 
 // ============================================
+// Staking API
+// ============================================
+
+export interface StakingPeriodItem {
+  id: string;
+  label: string;
+  duration_days: number;
+  reward_percent: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface StakingProductItem {
+  id: string;
+  asset: string;
+  name: string;
+  description: string | null;
+  min_stake: string | null;
+  periods: StakingPeriodItem[];
+}
+
+export interface StakingPositionItem {
+  id: string;
+  asset: string;
+  product_name: string;
+  amount: string;
+  reward_percent: string;
+  expected_reward: string;
+  period_label: string;
+  duration_days: number;
+  started_at: string;
+  unlock_at: string;
+  claimed_at: string | null;
+  status: string;
+  can_claim: boolean;
+}
+
+export const stakingApi = {
+  getProducts: () =>
+    request<{ products: StakingProductItem[] }>('/api/staking/products'),
+
+  getPositions: () =>
+    request<{ positions: StakingPositionItem[] }>('/api/staking/positions'),
+
+  stake: (data: { product_id: string; period_id: string; amount: string }) =>
+    request<{ ok: boolean; position: StakingPositionItem }>(
+      '/api/staking/stake',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  claim: (positionId: string) =>
+    request<{ ok: boolean; position: StakingPositionItem; total_received: string }>(
+      `/api/staking/positions/${positionId}/claim`,
+      { method: 'POST' },
+    ),
+};
+
+// ============================================
 // CMS API
 // ============================================
 
