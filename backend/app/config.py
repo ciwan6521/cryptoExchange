@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     LEVERAGE_MIN_MARGIN_USDT: str = "10"
     LEVERAGE_MAINTENANCE_MARGIN_RATE: str = "0.005"
 
+    # ── Convert / Swap ──
+    CONVERT_SPREAD_RATE: str = "0.005"
+
+    # ── OAuth (optional) ──
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    OAUTH_REDIRECT_BASE: str = "https://crypto4pro.io"
+
     # ── Pay4Pro Integration ──
     PAY4PRO_BASE_URL: str = ""
     PAY4PRO_API_KEY: str = ""  # legacy, kept for compat

@@ -99,6 +99,12 @@ class MarketDataService:
         while self._running:
             try:
                 await self._fetch_and_cache_all()
+                try:
+                    from app.tasks.platform_tasks import check_price_alerts, activate_stop_orders
+                    await check_price_alerts()
+                    await activate_stop_orders()
+                except Exception as e:
+                    logger.warning("Platform task error: %s", e)
             except Exception as e:
                 logger.error("Poll cycle error: %s", e)
             await asyncio.sleep(POLL_INTERVAL_SECONDS)

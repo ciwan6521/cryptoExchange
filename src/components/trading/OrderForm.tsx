@@ -155,9 +155,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       const result = await useOrderStore.getState().placeOrder({
         symbol: dashSymbol,
         side,
-        order_type: orderType === 'stop-limit' ? 'limit' : orderType,
+        order_type: orderType === 'stop-limit' ? 'stop_limit' : orderType,
         quantity,
         price: orderType !== 'market' ? price : undefined,
+        stop_price: orderType === 'stop-limit' ? stopPrice : undefined,
       });
       onSubmit?.(orderData);
       setQuantity('');

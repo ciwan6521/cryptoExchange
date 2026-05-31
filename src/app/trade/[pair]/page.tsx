@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { KycBanner } from '@/components/common/KycBanner';
-import { Orderbook, TradingChart, OrderForm, RecentTrades, TradingErrorBoundary, ConnectionBanner, ConnectionDot } from '@/components/trading';
+import { Orderbook, TradingChart, TradingViewChart, toTradingViewSymbol, OrderForm, RecentTrades, TradingErrorBoundary, ConnectionBanner, ConnectionDot } from '@/components/trading';
 import { Card, Badge, Skeleton, AnimatedNumber, CoinIcon } from '@/components/ui';
 import { useTicker, useTickers } from '@/hooks';
 import { formatPrice, formatPercent, formatNumber, cn } from '@/lib/utils';
@@ -42,6 +42,7 @@ export default function TradingPage() {
   const { openOrders, openOrdersLoading, orderHistory, orderHistoryLoading, userTrades, userTradesLoading, fetchOpenOrders, fetchOrderHistory, fetchUserTrades } = useOrderStore();
   const { balances, fetchBalances } = useBalanceStore();
   const [activeTab, setActiveTab] = useState<'open' | 'history' | 'trades'>('open');
+  const [chartMode, setChartMode] = useState<'native' | 'tradingview'>('tradingview');
   const [pairConfig, setPairConfig] = useState<TradingPairConfig | null>(null);
   
   // Parse pair from URL (e.g., "BTC-USDT" -> "BTC/USDT")
@@ -259,13 +260,41 @@ export default function TradingPage() {
           {/* Trading grid */}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-px bg-glass-border">
             {/* Chart */}
-            <div className="lg:col-span-8 bg-surface-400 min-h-[400px]">
-              <TradingErrorBoundary componentName="Chart">
-                <TradingChart
-                  symbol={symbol}
-                  basePrice={basePrice}
-                />
-              </TradingErrorBoundary>
+            <div className="lg:col-span-8 bg-surface-400 min-h-[400px] flex flex-col">
+              <div className="flex items-center gap-1 px-3 py-1.5 border-b border-glass-border bg-surface-300/50">
+                <button
+                  type="button"
+                  onClick={() => setChartMode('tradingview')}
+                  className={cn(
+                    'px-2.5 py-1 rounded text-xs font-medium transition-colors',
+                    chartMode === 'tradingview' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300',
+                  )}
+                >
+                  TradingView
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartMode('native')}
+                  className={cn(
+                    'px-2.5 py-1 rounded text-xs font-medium transition-colors',
+                    chartMode === 'native' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300',
+                  )}
+                >
+                  Native
+                </button>
+              </div>
+              <div className="flex-1 min-h-[360px]">
+                <TradingErrorBoundary componentName="Chart">
+                  {chartMode === 'tradingview' ? (
+                    <TradingViewChart symbol={toTradingViewSymbol(dashSymbol)} />
+                  ) : (
+                    <TradingChart
+                      symbol={symbol}
+                      basePrice={basePrice}
+                    />
+                  )}
+                </TradingErrorBoundary>
+              </div>
             </div>
             
             {/* Order form */}

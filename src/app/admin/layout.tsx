@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   CreditCard,
   Lock,
+  ArrowUpFromLine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminStore, type AdminPermissions } from '@/stores/admin-store';
@@ -49,6 +50,7 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     items: [
       { name: 'Users', href: '/admin/users', icon: Users, permission: 'canManageUsers' },
       { name: 'KYC Requests', href: '/admin/kyc', icon: ScanFace, permission: 'canManageUsers' },
+      { name: 'Withdrawals', href: '/admin/withdrawals', icon: ArrowUpFromLine, permission: 'canManageWallets' },
       { name: 'Balances', href: '/admin/balances', icon: Wallet, permission: 'canManageBalances' },
       { name: 'Orders & Trades', href: '/admin/orders', icon: ArrowLeftRight, permission: 'canManageOrders' },
       { name: 'Wallets', href: '/admin/wallets', icon: CreditCard, permission: 'canManageWallets' },

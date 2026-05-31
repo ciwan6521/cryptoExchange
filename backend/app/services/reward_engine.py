@@ -31,6 +31,7 @@ EVENT_TO_CAMPAIGN_TYPE = {
     "user_registered": ["signup_bonus"],
     "deposit_completed": ["deposit_bonus"],
     "trade_executed": ["trading_cashback", "fee_discount", "volume_reward"],
+    "referral_completed": ["referral_bonus"],
 }
 
 

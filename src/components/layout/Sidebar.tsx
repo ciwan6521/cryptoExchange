@@ -18,6 +18,8 @@ import {
   Gift,
   Sparkles,
   History,
+  ArrowDownUp,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IconButton } from '@/components/ui';
@@ -38,6 +40,8 @@ const mainNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Trade', href: '/trade/BTC-USDT', icon: LineChart },
   ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures', icon: TrendingUp }] : []),
+  { name: 'Convert', href: '/convert', icon: ArrowDownUp },
+  { name: 'P2P', href: '/p2p', icon: Users },
   { name: 'Wallet', href: '/wallet', icon: Wallet },
   { name: 'Earn', href: '/earn', icon: TrendingUp },
   { name: 'T4PRO ICO', href: '/ico/t4pro', icon: Sparkles },

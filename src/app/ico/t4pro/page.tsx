@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   Sparkles, Coins, Shield, Rocket, Users, ArrowRight, ExternalLink,
-  CheckCircle2, Globe, Zap, TrendingUp, Copy, Check,
+  CheckCircle2, Globe, Zap, TrendingUp, Copy, Check, Loader2, ShoppingBag,
 } from 'lucide-react';
 import { Header, Sidebar, Footer } from '@/components/layout';
 import { Button } from '@/components/ui';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
+import { launchpadApi, ApiError } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
+import { useBalanceStore } from '@/stores/balance-store';
+import { toast } from 'sonner';
 import {
   t4proIco,
   t4proSocialLinks,
@@ -58,7 +62,63 @@ const statusConfig = {
 export default function T4ProIcoPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { isAuthenticated } = useAuthStore();
+  const { fetchBalances } = useBalanceStore();
   const status = statusConfig[t4proIco.sale.status] || statusConfig.live;
+
+  const [sales, setSales] = useState<Array<{
+    id: string; token_symbol: string; name: string; price_usdt: string;
+    remaining: string; min_purchase_usdt: string; max_purchase_usdt: string;
+  }>>([]);
+  const [purchases, setPurchases] = useState<Array<{
+    id: string; token_symbol: string; amount_usdt: string; tokens: string; created_at: string;
+  }>>([]);
+  const [salesLoading, setSalesLoading] = useState(true);
+  const [purchaseAmount, setPurchaseAmount] = useState<Record<string, string>>({});
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+
+  const loadLaunchpad = useCallback(async () => {
+    setSalesLoading(true);
+    try {
+      const salesRes = await launchpadApi.getSales();
+      setSales(salesRes.sales || []);
+      if (isAuthenticated) {
+        const purchasesRes = await launchpadApi.getPurchases();
+        setPurchases(purchasesRes.purchases || []);
+      } else {
+        setPurchases([]);
+      }
+    } catch {
+      setSales([]);
+    } finally {
+      setSalesLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => { loadLaunchpad(); }, [loadLaunchpad]);
+
+  const handlePurchase = async (saleId: string) => {
+    if (!isAuthenticated) {
+      toast.error('Please log in to purchase');
+      return;
+    }
+    const amount = purchaseAmount[saleId];
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error('Enter a valid USDT amount');
+      return;
+    }
+    setPurchasingId(saleId);
+    try {
+      const res = await launchpadApi.purchase({ sale_id: saleId, amount_usdt: amount });
+      toast.success(`Purchased ${formatNumber(parseFloat(res.purchase.tokens))} ${res.purchase.token_symbol}`);
+      setPurchaseAmount(prev => ({ ...prev, [saleId]: '' }));
+      await Promise.all([loadLaunchpad(), fetchBalances()]);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : 'Purchase failed');
+    } finally {
+      setPurchasingId(null);
+    }
+  };
 
   const copySymbol = async () => {
     try {
@@ -303,6 +363,87 @@ export default function T4ProIcoPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Launchpad purchase */}
+        <section className="py-16 md:py-20 border-b border-glass-border bg-surface-300/30">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-10">
+              <span className="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium text-brand-400 bg-brand-500/10 rounded-full mb-4">
+                <ShoppingBag className="w-3.5 h-3.5" />
+                Launchpad
+              </span>
+              <h2 className="text-3xl font-display font-bold text-white mb-3">Purchase T4PRO</h2>
+              <p className="text-gray-400">Buy tokens directly from the platform launchpad using USDT</p>
+            </div>
+
+            {salesLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+              </div>
+            ) : sales.length === 0 ? (
+              <p className="text-center text-sm text-gray-600 py-8">No active sales at the moment</p>
+            ) : (
+              <div className="space-y-4">
+                {sales.map(sale => (
+                  <motion.div
+                    key={sale.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="rounded-2xl border border-glass-border bg-surface-200 p-6"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-white">{sale.name}</h3>
+                        <p className="text-sm text-gray-400 mt-1">
+                          ${sale.price_usdt} per {sale.token_symbol} · {sale.remaining} remaining
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Min ${sale.min_purchase_usdt} · Max ${sale.max_purchase_usdt}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="Amount in USDT"
+                        value={purchaseAmount[sale.id] || ''}
+                        onChange={e => setPurchaseAmount(prev => ({ ...prev, [sale.id]: e.target.value }))}
+                        className="flex-1 bg-surface-100 border border-glass-border rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/50"
+                      />
+                      <Button
+                        loading={purchasingId === sale.id}
+                        onClick={() => handlePurchase(sale.id)}
+                        icon={<Rocket className="w-4 h-4" />}
+                      >
+                        Purchase
+                      </Button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {isAuthenticated && purchases.length > 0 && (
+              <div className="mt-10">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Your Purchases</h3>
+                <div className="space-y-2">
+                  {purchases.map(p => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm"
+                    >
+                      <span className="text-white">{formatNumber(parseFloat(p.tokens))} {p.token_symbol}</span>
+                      <span className="text-gray-500">${p.amount_usdt} · {new Date(p.created_at).toLocaleDateString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

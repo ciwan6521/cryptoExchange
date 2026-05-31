@@ -1,5 +1,6 @@
 import type { WSMessage, TradingPair, Orderbook, Trade } from '@/types';
 import { generateId } from './utils';
+import { isEnabled } from './feature-flags';
 import { useTradingStore, type ConnectionStatus } from '@/stores/trading-store';
 
 // ============================================
@@ -45,6 +46,10 @@ class ExchangeWebSocket {
   // Track subscribed channels for re-subscribe on reconnect
   private activeChannels: Set<string> = new Set();
 
+  // Real-time market WebSocket connections (one per symbol)
+  private marketWs: Map<string, WebSocket> = new Map();
+  private marketWsRefCount: Map<string, number> = new Map();
+
   private setStoreStatus(status: ConnectionStatus): void {
     useTradingStore.getState().setConnectionStatus(status);
   }
@@ -86,6 +91,11 @@ class ExchangeWebSocket {
     }
     this.intervals.forEach(interval => clearInterval(interval));
     this.intervals.clear();
+    this.marketWs.forEach(ws => {
+      try { ws.close(); } catch { /* ignore */ }
+    });
+    this.marketWs.clear();
+    this.marketWsRefCount.clear();
     this.setStoreStatus('disconnected');
     this.onDisconnectHandlers.forEach(handler => handler());
   }
@@ -248,6 +258,148 @@ class ExchangeWebSocket {
       clearInterval(interval);
       this.intervals.delete(channel);
     }
+
+    const [type, symbol] = channel.split(':');
+    if (isEnabled('ENABLE_REALTIME') && (type === 'orderbook' || type === 'trades')) {
+      this._releaseMarketWs(symbol);
+    }
+  }
+
+  private _getMarketWsUrl(symbol: string): string {
+    const dashSymbol = symbol.replace('/', '-');
+    const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
+    return `${proto}//${host}/ws/market/${encodeURIComponent(dashSymbol)}`;
+  }
+
+  private _parseBackendOrderbook(data: { bids?: Array<{ price: string; quantity: string }>; asks?: Array<{ price: string; quantity: string }> }, basePrice: number): Orderbook {
+    const rawBids = data.bids || [];
+    const rawAsks = data.asks || [];
+
+    const bids = rawBids.map(l => ({
+      price: parseFloat(l.price),
+      quantity: parseFloat(l.quantity),
+      total: parseFloat(l.quantity),
+      percentage: 0,
+    }));
+    const asks = rawAsks.map(l => ({
+      price: parseFloat(l.price),
+      quantity: parseFloat(l.quantity),
+      total: parseFloat(l.quantity),
+      percentage: 0,
+    }));
+
+    let bidTotal = 0;
+    bids.forEach(l => { bidTotal += l.quantity; l.total = bidTotal; });
+    let askTotal = 0;
+    asks.forEach(l => { askTotal += l.quantity; l.total = askTotal; });
+
+    const maxTotal = Math.max(
+      bids.length > 0 ? bids[bids.length - 1].total : 0,
+      asks.length > 0 ? asks[asks.length - 1].total : 0,
+    );
+    if (maxTotal > 0) {
+      bids.forEach(l => (l.percentage = (l.total / maxTotal) * 100));
+      asks.forEach(l => (l.percentage = (l.total / maxTotal) * 100));
+    }
+
+    const bestBid = bids.length > 0 ? bids[0].price : basePrice;
+    const bestAsk = asks.length > 0 ? asks[0].price : basePrice;
+    const spread = bestAsk - bestBid;
+    return {
+      asks,
+      bids,
+      spread,
+      spreadPercentage: basePrice > 0 ? (spread / basePrice) * 100 : 0,
+      lastUpdate: Date.now(),
+    };
+  }
+
+  private _parseBackendTrades(data: { recent_trades?: Array<{ id: string; price: string; quantity: string; side: string; time?: string }> }): Trade[] {
+    return (data.recent_trades || []).map(t => ({
+      id: t.id,
+      price: parseFloat(t.price),
+      quantity: parseFloat(t.quantity),
+      side: t.side as 'buy' | 'sell',
+      timestamp: t.time ? new Date(t.time).getTime() : Date.now(),
+    }));
+  }
+
+  private _ensureMarketWs(symbol: string): void {
+    const count = this.marketWsRefCount.get(symbol) || 0;
+    this.marketWsRefCount.set(symbol, count + 1);
+    if (this.marketWs.has(symbol)) return;
+
+    const pair = this.tradingPairs.get(symbol);
+    const basePrice = pair?.price || 0;
+    const ws = new WebSocket(this._getMarketWsUrl(symbol));
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data as string);
+        if (data.type === 'pong') return;
+
+        const currentPair = this.tradingPairs.get(symbol);
+        const price = currentPair?.price || basePrice;
+
+        if (data.bids || data.asks) {
+          const ob = this._parseBackendOrderbook(data, price);
+          this.orderbooks.set(symbol, ob);
+          this._emit(`orderbook:${symbol}`, ob);
+        }
+
+        if (data.recent_trades) {
+          const trades = this._parseBackendTrades(data);
+          this.recentTrades.set(symbol, trades);
+          this._emit(`trades:${symbol}`, trades);
+        }
+
+        if (data.type === 'trade' && data.trade) {
+          const t = data.trade;
+          const trade: Trade = {
+            id: t.id || generateId(),
+            price: parseFloat(t.price),
+            quantity: parseFloat(t.quantity),
+            side: t.side as 'buy' | 'sell',
+            timestamp: t.time ? new Date(t.time).getTime() : Date.now(),
+          };
+          const existing = this.recentTrades.get(symbol) || [];
+          const merged = [trade, ...existing.filter(x => x.id !== trade.id)].slice(0, 100);
+          this.recentTrades.set(symbol, merged);
+          this._emit(`trades:${symbol}`, [trade]);
+        }
+      } catch {
+        /* ignore malformed messages */
+      }
+    };
+
+    ws.onclose = () => {
+      this.marketWs.delete(symbol);
+      if ((this.marketWsRefCount.get(symbol) || 0) > 0 && this.shouldReconnect) {
+        setTimeout(() => {
+          if ((this.marketWsRefCount.get(symbol) || 0) > 0 && !this.marketWs.has(symbol)) {
+            this.marketWsRefCount.set(symbol, (this.marketWsRefCount.get(symbol) || 1) - 1);
+            this._ensureMarketWs(symbol);
+          }
+        }, 2000);
+      }
+    };
+
+    this.marketWs.set(symbol, ws);
+  }
+
+  private _releaseMarketWs(symbol: string): void {
+    const count = (this.marketWsRefCount.get(symbol) || 0) - 1;
+    if (count <= 0) {
+      this.marketWsRefCount.delete(symbol);
+      const ws = this.marketWs.get(symbol);
+      if (ws) {
+        try { ws.close(); } catch { /* ignore */ }
+        this.marketWs.delete(symbol);
+      }
+    } else {
+      this.marketWsRefCount.set(symbol, count);
+    }
   }
 
   /**
@@ -255,6 +407,11 @@ class ExchangeWebSocket {
    * Shows empty book when no real liquidity (no synthetic data).
    */
   private _startOrderbookUpdates(symbol: string): void {
+    if (isEnabled('ENABLE_REALTIME') && typeof window !== 'undefined') {
+      this._ensureMarketWs(symbol);
+      return;
+    }
+
     const channel = `orderbook:${symbol}`;
     const pair = this.tradingPairs.get(symbol);
     if (!pair) return;
@@ -332,6 +489,11 @@ class ExchangeWebSocket {
    * No synthetic trades — empty until real executions exist.
    */
   private _startTradeUpdates(symbol: string): void {
+    if (isEnabled('ENABLE_REALTIME') && typeof window !== 'undefined') {
+      this._ensureMarketWs(symbol);
+      return;
+    }
+
     const channel = `trades:${symbol}`;
     const pair = this.tradingPairs.get(symbol);
     if (!pair) return;

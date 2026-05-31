@@ -1,0 +1,50 @@
+{
+  "nav": {
+    "dashboard": "Panel",
+    "trade": "Al-Sat",
+    "convert": "Dönüştür",
+    "p2p": "P2P",
+    "wallet": "Cüzdan",
+    "settings": "Ayarlar"
+  },
+  "common": {
+    "loading": "Yükleniyor...",
+    "error": "Bir hata oluştu",
+    "retry": "Tekrar dene",
+    "cancel": "İptal",
+    "confirm": "Onayla",
+    "save": "Kaydet"
+  },
+  "convert": {
+    "title": "Anında Dönüştür",
+    "subtitle": "Canlı kurlarla anında takas yapın",
+    "from": "Kaynak",
+    "to": "Hedef",
+    "amount": "Miktar",
+    "quote": "Alacağınız",
+    "rate": "Kur",
+    "fee": "Ücret",
+    "convert": "Dönüştür"
+  },
+  "p2p": {
+    "title": "P2P Pazar",
+    "buy": "Al",
+    "sell": "Sat",
+    "myOrders": "Emirlerim"
+  },
+  "options": {
+    "title": "Opsiyon İşlemleri",
+    "call": "Alım",
+    "put": "Satım",
+    "strike": "Kullanım Fiyatı",
+    "quantity": "Miktar",
+    "duration": "Süre",
+    "open": "Pozisyon Aç",
+    "positions": "Açık Pozisyonlar",
+    "close": "Kapat"
+  },
+  "language": {
+    "en": "English",
+    "tr": "Türkçe"
+  }
+}

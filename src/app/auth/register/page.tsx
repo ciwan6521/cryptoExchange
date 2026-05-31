@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, ArrowRight, Check, X, AlertTriangle, Phone, UserCircle } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
@@ -25,7 +25,21 @@ const USERNAME_MAX_LENGTH = 20;
 const PHONE_REGEX = /^\+?[0-9\s\-()]{7,20}$/;
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-surface-500 flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Loading...</p>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const referralFromUrl = searchParams.get('ref')?.trim() || '';
   const register = useAuthStore((s) => s.register);
   const { registrationEnabled } = useAdminStore((s) => s.systemFlags);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,12 +53,19 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
     agreeTerms: false,
+    referralCode: referralFromUrl,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const firstNameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (referralFromUrl) {
+      setFormData(prev => ({ ...prev, referralCode: referralFromUrl }));
+    }
+  }, [referralFromUrl]);
 
   useEffect(() => {
     if (step === 1) firstNameRef.current?.focus();
@@ -156,6 +177,7 @@ export default function RegisterPage() {
         first_name: formData.firstName.trim(),
         last_name: formData.lastName.trim(),
         phone: formData.phone.trim(),
+        ...(formData.referralCode.trim() ? { referral_code: formData.referralCode.trim() } : {}),
       });
       router.push('/auth/verify-email');
     } catch (err: unknown) {
@@ -305,6 +327,18 @@ export default function RegisterPage() {
               leftIcon={<User className="w-4 h-4" />}
               hint="This will be your public display name"
               autoComplete="username"
+            />
+
+            <Input
+              label="Referral Code (optional)"
+              name="referralCode"
+              type="text"
+              placeholder="Enter referral code"
+              value={formData.referralCode}
+              onChange={handleChange}
+              leftIcon={<User className="w-4 h-4" />}
+              hint={referralFromUrl ? 'Referral code applied from invite link' : 'Have a referral code? Enter it here'}
+              autoComplete="off"
             />
 
             <div className="flex gap-3">

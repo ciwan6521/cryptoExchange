@@ -19,20 +19,26 @@ import {
   ScanFace,
   Clock,
   ArrowRight,
+  Copy,
+  Trash2,
+  Plus,
+  TrendingUp,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { Card, CardHeader, Button, Input, Badge, Modal } from '@/components/ui';
 import { cn, formatTime } from '@/lib/utils';
-import { authApi, ApiError, type SessionItem } from '@/lib/api';
+import { authApi, ApiError, type SessionItem, apiKeysApi, alertsApi, notificationsApi, referralApi, type NotificationPrefs } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { isEnabled } from '@/lib/feature-flags';
+import { LanguageSwitcher, useI18n } from '@/lib/i18n';
 
-type SettingsTab = 'profile' | 'security' | 'notifications' | 'appearance';
+type SettingsTab = 'profile' | 'security' | 'notifications' | 'alerts' | 'appearance';
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'security', label: 'Security', icon: Shield },
   { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'alerts', label: 'Price Alerts', icon: TrendingUp },
   { id: 'appearance', label: 'Appearance', icon: Palette },
 ] as const;
 
@@ -101,6 +107,7 @@ export default function SettingsPage() {
               {activeTab === 'security' && <SecuritySettings />}
               {activeTab === 'profile' && <ProfileSettings />}
               {activeTab === 'notifications' && <NotificationSettings />}
+              {activeTab === 'alerts' && <PriceAlertsSettings />}
               {activeTab === 'appearance' && <AppearanceSettings />}
             </motion.div>
           </div>
@@ -265,17 +272,117 @@ function SecuritySettings() {
         </div>
       </Card>
 
-      {isEnabled('ENABLE_API_KEYS') && (
-        <Card>
-          <CardHeader title="API Keys" subtitle="Manage API keys for programmatic access" action={<Button size="sm">Create New Key</Button>} />
-          <div className="mt-4 p-6 rounded-xl bg-surface-100 border border-glass-border text-center">
-            <div className="w-12 h-12 rounded-xl bg-surface-50 flex items-center justify-center mx-auto mb-3">
-              <Key className="w-6 h-6 text-gray-500" />
+      {isEnabled('ENABLE_API_KEYS') && <ApiKeysCard />}
+    </>
+  );
+}
+
+function ApiKeysCard() {
+  const [keys, setKeys] = useState<Array<{ id: string; label: string; key_prefix: string; permissions: string; is_active: boolean; created_at: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+
+  const loadKeys = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await apiKeysApi.list();
+      setKeys(res.keys || []);
+    } catch {
+      toast.error('Failed to load API keys');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadKeys(); }, [loadKeys]);
+
+  const handleCreate = async () => {
+    if (!newLabel.trim()) { toast.error('Enter a label for the key'); return; }
+    setCreating(true);
+    try {
+      const res = await apiKeysApi.create({ label: newLabel.trim() });
+      setRevealedKey(res.key.api_key);
+      setNewLabel('');
+      setShowCreate(false);
+      toast.success('API key created — copy it now, it will not be shown again');
+      loadKeys();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.detail : 'Failed to create API key');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRevoke = async (id: string) => {
+    try {
+      await apiKeysApi.revoke(id);
+      toast.success('API key revoked');
+      loadKeys();
+    } catch {
+      toast.error('Failed to revoke API key');
+    }
+  };
+
+  const copyKey = (key: string) => {
+    navigator.clipboard.writeText(key);
+    toast.success('Copied to clipboard');
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader
+          title="API Keys"
+          subtitle="Manage API keys for programmatic access"
+          action={<Button size="sm" onClick={() => setShowCreate(true)}><Plus className="w-4 h-4 mr-1" />Create Key</Button>}
+        />
+        <div className="mt-4 space-y-3">
+          {loading ? (
+            <p className="text-sm text-gray-500">Loading keys...</p>
+          ) : keys.length === 0 ? (
+            <div className="p-6 rounded-xl bg-surface-100 border border-glass-border text-center">
+              <Key className="w-6 h-6 text-gray-500 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">No API keys created yet</p>
             </div>
-            <p className="text-sm text-gray-400">No API keys created yet</p>
+          ) : (
+            keys.map((key) => (
+              <div key={key.id} className="p-4 rounded-xl bg-surface-100 border border-glass-border flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-white">{key.label}</p>
+                  <p className="text-xs text-gray-500 font-mono mt-0.5">{key.key_prefix}••••••••</p>
+                  <p className="text-xs text-gray-600 mt-1">{key.permissions} • {new Date(key.created_at).toLocaleDateString()}</p>
+                </div>
+                <Button variant="ghost" size="sm" className="text-red-400" onClick={() => handleRevoke(key.id)}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
+
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Create API Key" size="sm">
+        <div className="space-y-4">
+          <Input label="Label" placeholder="My trading bot" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={handleCreate} loading={creating}>Create</Button>
           </div>
-        </Card>
-      )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!revealedKey} onClose={() => setRevealedKey(null)} title="Your API Key" size="sm">
+        <p className="text-sm text-amber-400 mb-3">Copy this key now. You will not be able to see it again.</p>
+        <div className="p-3 rounded-lg bg-surface-100 border border-glass-border flex items-center gap-2">
+          <code className="text-xs text-brand-400 font-mono break-all flex-1">{revealedKey}</code>
+          <Button size="sm" variant="ghost" onClick={() => revealedKey && copyKey(revealedKey)}>
+            <Copy className="w-4 h-4" />
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }
@@ -433,10 +540,15 @@ function ProfileSettings() {
   const user = useAuthStore((s) => s.user);
   const [username, setUsername] = useState(user?.username || '');
   const [saving, setSaving] = useState(false);
+  const [referral, setReferral] = useState<{ referral_code: string; referral_link: string; total_referrals: number } | null>(null);
 
   useEffect(() => {
     if (user?.username) setUsername(user.username);
   }, [user?.username]);
+
+  useEffect(() => {
+    referralApi.getMe().then(setReferral).catch(() => {});
+  }, []);
 
   const handleSave = async () => {
     if (!username.trim()) { toast.error('Username cannot be empty'); return; }
@@ -449,55 +561,232 @@ function ProfileSettings() {
     } finally { setSaving(false); }
   };
 
+  const copyReferral = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader title="Profile Information" subtitle="Update your personal details" />
+        <div className="mt-6 space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <User className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">{user?.email}</p>
+              <p className="text-xs text-gray-500">Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}</p>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
+            <Input label="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+            <Input label="Email" type="email" value={user?.email || ''} disabled />
+          </div>
+
+          <div className="pt-4 border-t border-glass-border">
+            <Button onClick={handleSave} loading={saving}>Save Changes</Button>
+          </div>
+        </div>
+      </Card>
+
+      {referral && (
+        <Card>
+          <CardHeader title="Referral Program" subtitle="Invite friends and earn rewards" />
+          <div className="mt-4 space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl bg-surface-100 border border-glass-border">
+                <p className="text-xs text-gray-500 mb-1">Your Code</p>
+                <div className="flex items-center gap-2">
+                  <code className="text-lg font-mono text-brand-400">{referral.referral_code}</code>
+                  <Button size="sm" variant="ghost" onClick={() => copyReferral(referral.referral_code)}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="p-4 rounded-xl bg-surface-100 border border-glass-border">
+                <p className="text-xs text-gray-500 mb-1">Total Referrals</p>
+                <p className="text-2xl font-bold text-white">{referral.total_referrals}</p>
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-surface-100 border border-glass-border flex items-center gap-2">
+              <code className="text-xs text-gray-300 break-all flex-1">{referral.referral_link}</code>
+              <Button size="sm" variant="ghost" onClick={() => copyReferral(referral.referral_link)}>
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function NotificationSettings() {
+  const { setLocale } = useI18n();
+  const [notifications, setNotifications] = useState<NotificationPrefs>({
+    email_enabled: true,
+    push_enabled: true,
+    trades_enabled: true,
+    price_alerts_enabled: false,
+    news_enabled: true,
+    security_enabled: true,
+    language: 'en',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    notificationsApi.getPreferences()
+      .then((prefs) => {
+        setNotifications(prefs);
+        if (prefs.language === 'en' || prefs.language === 'tr') {
+          setLocale(prefs.language);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [setLocale]);
+
+  const updatePref = async (key: keyof NotificationPrefs, value: boolean | string) => {
+    const next = { ...notifications, [key]: value };
+    setNotifications(next);
+    setSaving(true);
+    try {
+      const res = await notificationsApi.updatePreferences({ [key]: value });
+      setNotifications(res.preferences);
+      if (key === 'language' && (value === 'en' || value === 'tr')) {
+        setLocale(value);
+      }
+      toast.success('Preferences saved');
+    } catch {
+      setNotifications(notifications);
+      toast.error('Failed to save preferences');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader title="Notification Preferences" subtitle="Choose what notifications you receive" />
+        <p className="text-sm text-gray-500 mt-4">Loading...</p>
+      </Card>
+    );
+  }
+
   return (
     <Card>
-      <CardHeader title="Profile Information" subtitle="Update your personal details" />
-      <div className="mt-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-            <User className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white">{user?.email}</p>
-            <p className="text-xs text-gray-500">Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}</p>
-          </div>
+      <CardHeader title="Notification Preferences" subtitle="Choose what notifications you receive" action={saving ? <Badge variant="brand" size="sm">Saving...</Badge> : undefined} />
+      <div className="mt-6 space-y-6 divide-y divide-glass-border">
+        <div className="space-y-4">
+          <h4 className="text-sm font-medium text-gray-300">Channels</h4>
+          <NotificationRow title="Email Notifications" description="Receive notifications via email" checked={notifications.email_enabled} onChange={() => updatePref('email_enabled', !notifications.email_enabled)} />
+          <NotificationRow title="Push Notifications" description="Receive push notifications on your devices" checked={notifications.push_enabled} onChange={() => updatePref('push_enabled', !notifications.push_enabled)} />
         </div>
-
-        <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
-          <Input label="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
-          <Input label="Email" type="email" value={user?.email || ''} disabled />
-        </div>
-
-        <div className="pt-4 border-t border-glass-border">
-          <Button onClick={handleSave} loading={saving}>Save Changes</Button>
+        <div className="pt-6 space-y-4">
+          <h4 className="text-sm font-medium text-gray-300">Types</h4>
+          <NotificationRow title="Trade Confirmations" description="Get notified when your orders are filled" checked={notifications.trades_enabled} onChange={() => updatePref('trades_enabled', !notifications.trades_enabled)} />
+          <NotificationRow title="Price Alerts" description="Get notified when prices reach your targets" checked={notifications.price_alerts_enabled} onChange={() => updatePref('price_alerts_enabled', !notifications.price_alerts_enabled)} />
+          <NotificationRow title="News & Updates" description="Stay updated with market news and platform updates" checked={notifications.news_enabled} onChange={() => updatePref('news_enabled', !notifications.news_enabled)} />
+          <NotificationRow title="Security Alerts" description="Get notified about security-related events" checked={notifications.security_enabled} onChange={() => updatePref('security_enabled', !notifications.security_enabled)} />
         </div>
       </div>
     </Card>
   );
 }
 
-function NotificationSettings() {
-  const [notifications, setNotifications] = useState({
-    email: true, push: true, trades: true, price: false, news: true, security: true,
-  });
-  const toggle = (key: keyof typeof notifications) => {
-    setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+function PriceAlertsSettings() {
+  const [alerts, setAlerts] = useState<Array<{ id: string; asset: string; condition: string; target_price: string; is_active: boolean }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [asset, setAsset] = useState('BTC');
+  const [condition, setCondition] = useState<'above' | 'below'>('above');
+  const [targetPrice, setTargetPrice] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const loadAlerts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await alertsApi.list();
+      setAlerts(res.alerts || []);
+    } catch {
+      toast.error('Failed to load price alerts');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAlerts(); }, [loadAlerts]);
+
+  const handleCreate = async () => {
+    if (!targetPrice.trim()) { toast.error('Enter a target price'); return; }
+    setCreating(true);
+    try {
+      await alertsApi.create({ asset, condition, target_price: targetPrice.trim() });
+      toast.success('Price alert created');
+      setTargetPrice('');
+      loadAlerts();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.detail : 'Failed to create alert');
+    } finally {
+      setCreating(false);
+    }
   };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await alertsApi.delete(id);
+      toast.success('Alert removed');
+      loadAlerts();
+    } catch {
+      toast.error('Failed to delete alert');
+    }
+  };
+
   return (
     <Card>
-      <CardHeader title="Notification Preferences" subtitle="Choose what notifications you receive" />
-      <div className="mt-6 space-y-6 divide-y divide-glass-border">
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-gray-300">Channels</h4>
-          <NotificationRow title="Email Notifications" description="Receive notifications via email" checked={notifications.email} onChange={() => toggle('email')} />
-          <NotificationRow title="Push Notifications" description="Receive push notifications on your devices" checked={notifications.push} onChange={() => toggle('push')} />
+      <CardHeader title="Price Alerts" subtitle="Get notified when an asset reaches your target price" />
+      <div className="mt-6 space-y-6">
+        <div className="grid sm:grid-cols-3 gap-4 max-w-2xl">
+          <Input label="Asset" value={asset} onChange={(e) => setAsset(e.target.value.toUpperCase())} placeholder="BTC" />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Condition</label>
+            <select
+              value={condition}
+              onChange={(e) => setCondition(e.target.value as 'above' | 'below')}
+              className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-glass-border text-white text-sm"
+            >
+              <option value="above">Price goes above</option>
+              <option value="below">Price goes below</option>
+            </select>
+          </div>
+          <Input label="Target Price (USDT)" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} placeholder="50000" />
         </div>
-        <div className="pt-6 space-y-4">
-          <h4 className="text-sm font-medium text-gray-300">Types</h4>
-          <NotificationRow title="Trade Confirmations" description="Get notified when your orders are filled" checked={notifications.trades} onChange={() => toggle('trades')} />
-          <NotificationRow title="Price Alerts" description="Get notified when prices reach your targets" checked={notifications.price} onChange={() => toggle('price')} />
-          <NotificationRow title="News & Updates" description="Stay updated with market news and platform updates" checked={notifications.news} onChange={() => toggle('news')} />
-          <NotificationRow title="Security Alerts" description="Get notified about security-related events" checked={notifications.security} onChange={() => toggle('security')} />
+        <Button onClick={handleCreate} loading={creating}>Create Alert</Button>
+
+        <div className="pt-4 border-t border-glass-border space-y-3">
+          {loading ? (
+            <p className="text-sm text-gray-500">Loading alerts...</p>
+          ) : alerts.length === 0 ? (
+            <p className="text-sm text-gray-500">No price alerts yet.</p>
+          ) : (
+            alerts.map((alert) => (
+              <div key={alert.id} className="p-4 rounded-xl bg-surface-100 border border-glass-border flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-white">{alert.asset}/USDT</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Notify when price goes {alert.condition} ${alert.target_price}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" className="text-red-400" onClick={() => handleDelete(alert.id)}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </Card>
@@ -527,6 +816,10 @@ function AppearanceSettings() {
     <Card>
       <CardHeader title="Appearance" subtitle="Customize how Crypto4Pro looks" />
       <div className="mt-6 space-y-6">
+        <div>
+          <h4 className="text-sm font-medium text-gray-300 mb-3">Language</h4>
+          <LanguageSwitcher />
+        </div>
         <div>
           <h4 className="text-sm font-medium text-gray-300 mb-3">Theme</h4>
           <div className="grid grid-cols-3 gap-3">

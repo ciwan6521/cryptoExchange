@@ -8,6 +8,7 @@ import { useAdminStore } from '@/stores/admin-store';
 import { marketApi } from '@/lib/api';
 import { MaintenanceGuard } from '@/components/layout/MaintenanceGuard';
 import { AnnouncementBar, MaintenanceNoticeBar, CMSPopup } from '@/components/layout/CMSRenderer';
+import { I18nProvider } from '@/lib/i18n';
 
 // ============================================
 // App Providers
@@ -54,11 +55,13 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({ children })
   }, []);
 
   return (
-    <MaintenanceGuard>
-      <AnnouncementBar />
-      <MaintenanceNoticeBar />
-      {children}
-      <CMSPopup />
-    </MaintenanceGuard>
+    <I18nProvider>
+      <MaintenanceGuard>
+        <AnnouncementBar />
+        <MaintenanceNoticeBar />
+        {children}
+        <CMSPopup />
+      </MaintenanceGuard>
+    </I18nProvider>
   );
 };

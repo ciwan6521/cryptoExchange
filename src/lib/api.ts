@@ -113,8 +113,18 @@ export interface SessionItem {
   is_current: boolean;
 }
 
+export interface RegisterData {
+  email: string;
+  username: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  referral_code?: string;
+}
+
 export const authApi = {
-  register: (data: { email: string; username: string; password: string; first_name: string; last_name: string; phone: string }) =>
+  register: (data: RegisterData) =>
     request<UserResponse>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -436,9 +446,10 @@ export const tradingApi = {
 export interface PlaceOrderRequest {
   symbol: string;
   side: 'buy' | 'sell';
-  order_type: 'limit' | 'market';
+  order_type: 'limit' | 'market' | 'stop_limit' | 'stop-limit';
   quantity: string;
   price?: string;
+  stop_price?: string;
 }
 
 export interface PlaceOrderResponse {
@@ -835,6 +846,124 @@ export const walletApi = {
 
   getTickers: () =>
     request<TickersResponse>('/api/market/tickers'),
+};
+
+// ============================================
+// Convert API
+// ============================================
+
+export const convertApi = {
+  getAssets: () => request<{ assets: string[] }>('/api/convert/assets'),
+  quote: (data: { from_asset: string; to_asset: string; from_amount: string }) =>
+    request<{ from_asset: string; to_asset: string; from_amount: string; to_amount: string; rate: string; fee_usd: string }>(
+      '/api/convert/quote', { method: 'POST', body: JSON.stringify(data) },
+    ),
+  execute: (data: { from_asset: string; to_asset: string; from_amount: string }) =>
+    request<{ ok: boolean; convert_id: string; to_amount: string }>(
+      '/api/convert/execute', { method: 'POST', body: JSON.stringify(data) },
+    ),
+};
+
+// ============================================
+// Referral API
+// ============================================
+
+export const referralApi = {
+  getMe: () => request<{ referral_code: string; referral_link: string; total_referrals: number }>('/api/referral/me'),
+  validate: (code: string) => request<{ valid: boolean; referrer_username: string }>(`/api/referral/validate/${code}`),
+};
+
+// ============================================
+// API Keys
+// ============================================
+
+export const apiKeysApi = {
+  list: () => request<{ keys: Array<{ id: string; label: string; key_prefix: string; permissions: string; is_active: boolean; created_at: string }> }>('/api/api-keys'),
+  create: (data: { label: string; permissions?: string }) =>
+    request<{ ok: boolean; key: { id: string; api_key: string; label: string }; warning: string }>(
+      '/api/api-keys', { method: 'POST', body: JSON.stringify(data) },
+    ),
+  revoke: (id: string) => request<{ ok: boolean }>(`/api/api-keys/${id}`, { method: 'DELETE' }),
+};
+
+// ============================================
+// Price Alerts
+// ============================================
+
+export const alertsApi = {
+  list: () => request<{ alerts: Array<{ id: string; asset: string; condition: string; target_price: string; is_active: boolean }> }>('/api/alerts'),
+  create: (data: { asset: string; condition: 'above' | 'below'; target_price: string }) =>
+    request<{ ok: boolean; alert: { id: string } }>('/api/alerts', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ ok: boolean }>(`/api/alerts/${id}`, { method: 'DELETE' }),
+};
+
+// ============================================
+// Notifications
+// ============================================
+
+export interface NotificationPrefs {
+  email_enabled: boolean;
+  push_enabled: boolean;
+  trades_enabled: boolean;
+  price_alerts_enabled: boolean;
+  news_enabled: boolean;
+  security_enabled: boolean;
+  language: string;
+}
+
+export const notificationsApi = {
+  getPreferences: () => request<NotificationPrefs>('/api/notifications/preferences'),
+  updatePreferences: (data: Partial<NotificationPrefs>) =>
+    request<{ ok: boolean; preferences: NotificationPrefs }>('/api/notifications/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+};
+
+// ============================================
+// Launchpad
+// ============================================
+
+export const launchpadApi = {
+  getSales: () => request<{ sales: Array<{ id: string; token_symbol: string; name: string; price_usdt: string; remaining: string; min_purchase_usdt: string; max_purchase_usdt: string }> }>('/api/launchpad/sales'),
+  getPurchases: () => request<{ purchases: Array<{ id: string; token_symbol: string; amount_usdt: string; tokens: string; created_at: string }> }>('/api/launchpad/purchases'),
+  purchase: (data: { sale_id: string; amount_usdt: string }) =>
+    request<{ ok: boolean; purchase: { tokens: string; amount_usdt: string; token_symbol: string } }>(
+      '/api/launchpad/purchase', { method: 'POST', body: JSON.stringify(data) },
+    ),
+};
+
+// ============================================
+// P2P
+// ============================================
+
+export const p2pApi = {
+  listAds: (params?: { side?: string; asset?: string }) => {
+    const qs = new URLSearchParams(params as Record<string, string>).toString();
+    return request<{ ads: Array<{ id: string; side: string; asset: string; fiat_currency: string; price: string; min_amount: string; max_amount: string; payment_method: string }> }>(
+      `/api/p2p/ads${qs ? `?${qs}` : ''}`,
+    );
+  },
+  createAd: (data: { side: string; asset: string; fiat_currency: string; price: string; min_amount: string; max_amount: string; payment_method: string }) =>
+    request<{ ok: boolean; ad_id: string }>('/api/p2p/ads', { method: 'POST', body: JSON.stringify(data) }),
+  startOrder: (adId: string, amount: string) =>
+    request<{ ok: boolean; order_id: string; total_fiat: string }>(`/api/p2p/ads/${adId}/order`, {
+      method: 'POST', body: JSON.stringify({ amount }),
+    }),
+  myOrders: () => request<{ orders: Array<{ id: string; asset: string; amount: string; total_fiat: string; status: string; role: string }> }>('/api/p2p/orders'),
+  confirm: (orderId: string) => request<{ ok: boolean }>(`/api/p2p/orders/${orderId}/confirm`, { method: 'POST' }),
+  cancel: (orderId: string) => request<{ ok: boolean }>(`/api/p2p/orders/${orderId}/cancel`, { method: 'POST' }),
+};
+
+// ============================================
+// Options
+// ============================================
+
+export const optionsApi = {
+  getPositions: () => request<{ positions: Array<{ id: string; asset: string; option_type: string; strike_price: string; premium_usdt: string; quantity: string; expiry_at: string; status: string; unrealized_pnl: string | null }> }>('/api/options/positions'),
+  open: (data: { asset: string; option_type: string; strike_price: string; quantity: string; duration_days?: number }) =>
+    request<{ ok: boolean; position_id: string; premium_usdt: string }>('/api/options/open', { method: 'POST', body: JSON.stringify(data) }),
+  close: (id: string) => request<{ ok: boolean; realized_pnl: string }>(`/api/options/positions/${id}/close`, { method: 'POST' }),
 };
 
 // ── KYC ──

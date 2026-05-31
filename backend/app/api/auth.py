@@ -81,6 +81,16 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
         raise HTTPException(status_code=400, detail="; ".join(pw_errors))
 
     # Create user
+    referrer_id = None
+    if body.referral_code:
+        ref_result = await db.execute(
+            select(User).where(User.referral_code == body.referral_code.strip().upper())
+        )
+        referrer = ref_result.scalar_one_or_none()
+        if referrer:
+            referrer_id = referrer.id
+
+    import secrets as _secrets
     user = User(
         email=body.email,
         username=body.username,
@@ -88,6 +98,8 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
         first_name=body.first_name.strip(),
         last_name=body.last_name.strip(),
         phone=body.phone.strip(),
+        referral_code=_secrets.token_hex(4).upper(),
+        referred_by_user_id=referrer_id,
         last_login_at=datetime.now(timezone.utc),
         last_login_ip=request.client.host if request.client else None,
     )
@@ -136,6 +148,11 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
     try:
         bus = await EventBus.get_instance()
         await bus.publish_user_registered(str(user.id), user.email)
+        if referrer_id:
+            await bus.publish("referral_completed", {
+                "user_id": str(referrer_id),
+                "data": {"referred_user_id": str(user.id)},
+            })
     except Exception:
         pass
 

@@ -18,11 +18,14 @@ import {
   History,
   TrendingUp,
   Sparkles,
+  ArrowDownUp,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button, IconButton } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { isEnabled } from '@/lib/feature-flags';
+import { LanguageSwitcher } from '@/lib/i18n';
 
 // ============================================
 // Header Component
@@ -37,6 +40,8 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Trade', href: '/trade/BTC-USDT', icon: LineChart },
   ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures', icon: LineChart }] : []),
+  { name: 'Convert', href: '/convert', icon: ArrowDownUp },
+  { name: 'P2P', href: '/p2p', icon: Users },
   { name: 'Earn', href: '/earn', icon: TrendingUp },
   { name: 'T4PRO ICO', href: '/ico/t4pro', icon: Sparkles },
   { name: 'Wallet', href: '/wallet', icon: Wallet },
@@ -126,10 +131,9 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 </Link>
                 <Link
                   href="/markets/options"
-                  className="flex items-center justify-between px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                  className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
                 >
                   Options
-                  <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">Soon</span>
                 </Link>
               </div>
             </div>
@@ -138,6 +142,8 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         
         {/* Right section */}
         <div className="flex items-center gap-2">
+          <LanguageSwitcher className="hidden sm:flex" />
+
           {/* Search */}
           <div className="hidden md:block">
             <div className="relative">

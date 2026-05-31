@@ -9,6 +9,10 @@ from app.models.supported_asset import SupportedAsset
 from app.models.deposit_method import DepositMethod
 from app.models.staking import StakingProduct, StakingPeriod, StakingPosition
 from app.models.leverage import LeveragePosition
+from app.models.platform import (
+    UserApiKey, UserNotificationPreference, PriceAlert,
+    LaunchpadSale, LaunchpadPurchase, P2PAd, P2POrder, OptionPosition,
+)
 
 __all__ = [
     "User", "UserSession", "AdminUser",
@@ -21,4 +25,6 @@ __all__ = [
     "DepositMethod",
     "StakingProduct", "StakingPeriod", "StakingPosition",
     "LeveragePosition",
+    "UserApiKey", "UserNotificationPreference", "PriceAlert",
+    "LaunchpadSale", "LaunchpadPurchase", "P2PAd", "P2POrder", "OptionPosition",
 ]

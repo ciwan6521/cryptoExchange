@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { authApi, type UserResponse, ApiError } from '@/lib/api';
+import { authApi, type UserResponse, type RegisterData, ApiError } from '@/lib/api';
 
 // ============================================
 // Auth Store
@@ -36,7 +36,7 @@ interface AuthState {
   error: string | null;
 
   // Actions — all go through backend
-  register: (data: { email: string; username: string; password: string; first_name: string; last_name: string; phone: string }) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   login: (data: { email: string; password: string; totp_code?: string }) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;

@@ -471,3 +471,87 @@ export const adminStakingApi = {
       method: 'DELETE',
     }),
 };
+
+// ============================================
+// Admin Withdrawals
+// ============================================
+
+export interface AdminWithdrawalItem {
+  id: string;
+  user_id: string;
+  asset: string;
+  network: string;
+  amount: string;
+  fee: string;
+  to_address: string;
+  status: string;
+  requires_multi_approval: boolean;
+  approvals_required: number;
+  approvals_received: number;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  tx_hash: string | null;
+  pay4pro_withdrawal_id: string | null;
+  request_ip: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface AdminWithdrawalApprovalItem {
+  id: string;
+  admin_id: string;
+  action: string;
+  comment: string | null;
+  ip_address: string | null;
+  created_at: string | null;
+}
+
+export const adminWithdrawalsApi = {
+  listPending: () =>
+    adminRequest<{ withdrawals: AdminWithdrawalItem[]; total: number }>(
+      '/api/admin/withdrawals/pending',
+    ),
+
+  list: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set('status', params.status);
+    if (params?.limit) sp.set('limit', String(params.limit));
+    if (params?.offset) sp.set('offset', String(params.offset));
+    const qs = sp.toString();
+    return adminRequest<{ withdrawals: AdminWithdrawalItem[]; total: number }>(
+      `/api/admin/withdrawals${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  getDetail: (withdrawalId: string) =>
+    adminRequest<{ withdrawal: AdminWithdrawalItem; approvals: AdminWithdrawalApprovalItem[] }>(
+      `/api/admin/withdrawals/${withdrawalId}`,
+    ),
+
+  approve: (withdrawalId: string, data?: { comment?: string; totp_code?: string }) =>
+    adminRequest<{ ok: boolean; withdrawal: AdminWithdrawalItem; message: string }>(
+      `/api/admin/withdrawals/${withdrawalId}/approve`,
+      { method: 'POST', body: JSON.stringify(data || {}) },
+    ),
+
+  reject: (withdrawalId: string, reason: string) =>
+    adminRequest<{ ok: boolean; withdrawal: AdminWithdrawalItem }>(
+      `/api/admin/withdrawals/${withdrawalId}/reject`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+    ),
+
+  settle: (withdrawalId: string, tx_hash?: string) =>
+    adminRequest<{ ok: boolean; withdrawal: AdminWithdrawalItem }>(
+      `/api/admin/withdrawals/${withdrawalId}/settle`,
+      { method: 'POST', body: JSON.stringify({ tx_hash }) },
+    ),
+
+  getStats: () =>
+    adminRequest<{
+      pending_count: number;
+      today_approved_total: string;
+      multi_approval_threshold: string;
+      daily_limit_per_user: string;
+    }>('/api/admin/withdrawals/stats/summary'),
+};

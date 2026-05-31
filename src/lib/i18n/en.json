@@ -1,0 +1,50 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "trade": "Trade",
+    "convert": "Convert",
+    "p2p": "P2P",
+    "wallet": "Wallet",
+    "settings": "Settings"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save"
+  },
+  "convert": {
+    "title": "Instant Convert",
+    "subtitle": "Swap assets instantly at live rates",
+    "from": "From",
+    "to": "To",
+    "amount": "Amount",
+    "quote": "You receive",
+    "rate": "Rate",
+    "fee": "Fee",
+    "convert": "Convert Now"
+  },
+  "p2p": {
+    "title": "P2P Marketplace",
+    "buy": "Buy",
+    "sell": "Sell",
+    "myOrders": "My Orders"
+  },
+  "options": {
+    "title": "Options Trading",
+    "call": "Call",
+    "put": "Put",
+    "strike": "Strike Price",
+    "quantity": "Quantity",
+    "duration": "Duration",
+    "open": "Open Position",
+    "positions": "Open Positions",
+    "close": "Close"
+  },
+  "language": {
+    "en": "English",
+    "tr": "Türkçe"
+  }
+}

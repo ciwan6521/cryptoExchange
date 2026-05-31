@@ -27,6 +27,8 @@ from app.api.deps import get_current_user
 from app.api.deps_flags import require_trading_enabled
 from app.middleware.rate_limit import rate_limit_orders
 from app.services.matching_engine import MatchingEngine, OrderError
+from app.models.trading import Order, TradingPair
+from app.services.ledger_service import InsufficientBalanceError
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -37,6 +39,7 @@ class PlaceOrderRequest(BaseModel):
     order_type: str = Field(default="limit", max_length=15)
     quantity: str  # String for Decimal precision
     price: Optional[str] = None  # Required for limit orders
+    stop_price: Optional[str] = None
 
 
 def _serialize_order(o) -> dict:
@@ -47,6 +50,7 @@ def _serialize_order(o) -> dict:
         "order_type": o.order_type,
         "status": o.status,
         "price": str(o.price) if o.price else None,
+        "stop_price": str(o.stop_price) if o.stop_price else None,
         "quantity": str(o.quantity),
         "filled_quantity": str(o.filled_quantity),
         "remaining": str(o.remaining),
@@ -104,19 +108,54 @@ async def place_order(
         raise HTTPException(status_code=400, detail="Invalid quantity format")
 
     price = None
+    stop_price = None
     if body.price is not None:
         try:
             price = Decimal(body.price)
         except (InvalidOperation, ValueError):
             raise HTTPException(status_code=400, detail="Invalid price format")
+    if body.stop_price is not None:
+        try:
+            stop_price = Decimal(body.stop_price)
+        except (InvalidOperation, ValueError):
+            raise HTTPException(status_code=400, detail="Invalid stop price format")
+
+    order_type = body.order_type.lower().replace("-", "_")
 
     engine = MatchingEngine(db)
     try:
+        if order_type == "stop_limit":
+            if stop_price is None or price is None:
+                raise HTTPException(status_code=400, detail="Stop-limit requires price and stop_price")
+            pair = await engine._get_pair(body.symbol)
+            engine._validate_order_params(pair, body.side.lower(), "limit", quantity, price)
+            order_id = uuid.uuid4()
+            order = Order(
+                id=order_id,
+                user_id=user.id,
+                pair_id=pair.id,
+                symbol=pair.symbol,
+                side=body.side.lower(),
+                order_type="stop_limit",
+                status="pending_stop",
+                price=price,
+                stop_price=stop_price,
+                quantity=quantity,
+                filled_quantity=Decimal("0"),
+                remaining=quantity,
+            )
+            db.add(order)
+            await db.flush()
+            await engine._lock_order_funds(user.id, pair, body.side.lower(), "limit", quantity, price, order.id)
+            await db.commit()
+            await db.refresh(order)
+            return {"ok": True, "order": _serialize_order(order), "fills": [], "fills_count": 0}
+
         result = await engine.place_order(
             user=user,
             symbol=body.symbol,
             side=body.side.lower(),
-            order_type=body.order_type.lower(),
+            order_type=order_type,
             quantity=quantity,
             price=price,
         )

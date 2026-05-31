@@ -73,6 +73,15 @@ from app.api.deposits import router as deposits_router
 from app.api.kyc import router as kyc_router
 from app.api.staking import router as staking_router
 from app.api.leverage import router as leverage_router
+from app.api.convert import router as convert_router
+from app.api.referral import router as referral_router
+from app.api.api_keys import router as api_keys_router
+from app.api.alerts import router as alerts_router
+from app.api.notifications import router as notifications_router
+from app.api.launchpad import router as launchpad_router
+from app.api.p2p import router as p2p_router
+from app.api.options import router as options_router
+from app.api.oauth import router as oauth_router
 from app.services.market_data import get_market_data_service
 
 
@@ -157,6 +166,15 @@ app.include_router(deposits_router)
 app.include_router(kyc_router)
 app.include_router(staking_router)
 app.include_router(leverage_router)
+app.include_router(convert_router)
+app.include_router(referral_router)
+app.include_router(api_keys_router)
+app.include_router(alerts_router)
+app.include_router(notifications_router)
+app.include_router(launchpad_router)
+app.include_router(p2p_router)
+app.include_router(options_router)
+app.include_router(oauth_router)
 
 # Register routers — Admin
 app.include_router(admin_auth_router)

@@ -4,6 +4,7 @@
 
 export { Orderbook } from './Orderbook';
 export { TradingChart } from './TradingChart';
+export { TradingViewChart, toTradingViewSymbol } from './TradingViewChart';
 export { OrderForm } from './OrderForm';
 export { RecentTrades } from './RecentTrades';
 export { TradingErrorBoundary } from './TradingErrorBoundary';
