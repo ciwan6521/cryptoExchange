@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button, IconButton } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
+import { isEnabled } from '@/lib/feature-flags';
 
 // ============================================
 // Header Component
@@ -33,6 +34,7 @@ interface HeaderProps {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Trade', href: '/trade/BTC-USDT', icon: LineChart },
+  ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures', icon: LineChart }] : []),
   { name: 'Wallet', href: '/wallet', icon: Wallet },
   { name: 'Rewards', href: '/rewards', icon: Gift },
 ];

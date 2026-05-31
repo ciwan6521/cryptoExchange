@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     ALCHEMY_API_KEY: str = ""
     TRON_API_KEY: str = ""
 
+    # ── Leverage / Futures ──
+    ENABLE_FUTURES: bool = True
+    LEVERAGE_MAX: int = 100
+    LEVERAGE_MIN_MARGIN_USDT: str = "10"
+    LEVERAGE_MAINTENANCE_MARGIN_RATE: str = "0.005"
+
     # ── Pay4Pro Integration ──
     PAY4PRO_BASE_URL: str = ""
     PAY4PRO_API_KEY: str = ""  # legacy, kept for compat

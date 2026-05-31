@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
+import { KycBanner } from '@/components/common/KycBanner';
 import { Orderbook, TradingChart, OrderForm, RecentTrades, TradingErrorBoundary, ConnectionBanner, ConnectionDot } from '@/components/trading';
 import { Card, Badge, Skeleton, AnimatedNumber, CoinIcon } from '@/components/ui';
 import { useTicker, useTickers } from '@/hooks';
@@ -102,6 +103,7 @@ export default function TradingPage() {
       {/* Connection status banner */}
       <div className="pt-16">
         <ConnectionBanner />
+        <KycBanner action="place orders" />
       </div>
       
       {/* Mobile trade restriction notice */}

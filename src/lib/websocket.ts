@@ -252,7 +252,7 @@ class ExchangeWebSocket {
 
   /**
    * Fetch real orderbook from backend API, then poll for updates.
-   * Falls back to price-derived synthetic orderbook if backend returns empty data.
+   * Shows empty book when no real liquidity (no synthetic data).
    */
   private _startOrderbookUpdates(symbol: string): void {
     const channel = `orderbook:${symbol}`;
@@ -261,27 +261,13 @@ class ExchangeWebSocket {
 
     const dashSymbol = symbol.replace('/', '-');
 
-    const generateSyntheticOB = (basePrice: number): Orderbook => {
-      const asks: { price: number; quantity: number; total: number; percentage: number }[] = [];
-      const bids: { price: number; quantity: number; total: number; percentage: number }[] = [];
-      const tickSize = basePrice > 10000 ? 0.01 : basePrice > 100 ? 0.01 : 0.0001;
-      const spread = tickSize * (Math.floor(Math.random() * 3) + 1);
-      let askTotal = 0, bidTotal = 0;
-
-      for (let i = 0; i < 20; i++) {
-        const offset = (i + 1) * tickSize * (1 + Math.random() * 0.5);
-        const aq = Math.random() * 5 + 0.1;
-        askTotal += aq;
-        asks.push({ price: basePrice + spread / 2 + offset, quantity: aq, total: askTotal, percentage: 0 });
-        const bq = Math.random() * 5 + 0.1;
-        bidTotal += bq;
-        bids.push({ price: basePrice - spread / 2 - offset, quantity: bq, total: bidTotal, percentage: 0 });
-      }
-      const max = Math.max(askTotal, bidTotal);
-      asks.forEach(l => (l.percentage = (l.total / max) * 100));
-      bids.forEach(l => (l.percentage = (l.total / max) * 100));
-      return { asks, bids, spread, spreadPercentage: (spread / basePrice) * 100, lastUpdate: Date.now() };
-    };
+    const emptyOrderbook = (): Orderbook => ({
+      asks: [],
+      bids: [],
+      spread: 0,
+      spreadPercentage: 0,
+      lastUpdate: Date.now(),
+    });
 
     const parseBackendOB = (data: any, basePrice: number): Orderbook | null => {
       const rawBids: any[] = data.bids || [];
@@ -330,8 +316,8 @@ class ExchangeWebSocket {
             return;
           }
         }
-      } catch { /* fall through to synthetic */ }
-      const ob = generateSyntheticOB(price);
+      } catch { /* show empty book */ }
+      const ob = emptyOrderbook();
       this.orderbooks.set(symbol, ob);
       this._emit(channel, ob);
     };
@@ -343,7 +329,7 @@ class ExchangeWebSocket {
 
   /**
    * Fetch real trades from backend, then poll for new ones.
-   * Falls back to synthetic trades if backend returns empty.
+   * No synthetic trades — empty until real executions exist.
    */
   private _startTradeUpdates(symbol: string): void {
     const channel = `trades:${symbol}`;
@@ -351,7 +337,6 @@ class ExchangeWebSocket {
     if (!pair) return;
 
     const dashSymbol = symbol.replace('/', '-');
-    let hasRealData = false;
 
     const fetchRealTrades = async (): Promise<Trade[]> => {
       try {
@@ -360,7 +345,6 @@ class ExchangeWebSocket {
         const data = await res.json();
         const trades: any[] = data.trades || [];
         if (trades.length === 0) return [];
-        hasRealData = true;
         return trades.map((t: any) => ({
           id: t.id,
           price: parseFloat(t.price),
@@ -373,66 +357,26 @@ class ExchangeWebSocket {
       }
     };
 
-    const generateSyntheticTrades = (): Trade[] => {
-      const initial: Trade[] = [];
-      let t = Date.now();
-      for (let i = 0; i < 20; i++) {
-        const currentPair = this.tradingPairs.get(symbol);
-        const baseP = currentPair?.price || pair.price;
-        initial.push({
-          id: generateId(),
-          price: baseP + (Math.random() - 0.5) * baseP * 0.001,
-          quantity: Math.random() * 2 + 0.01,
-          side: Math.random() > 0.5 ? 'buy' : 'sell',
-          timestamp: t,
-        });
-        t -= Math.floor(Math.random() * 5000) + 100;
-      }
-      return initial;
-    };
-
     const init = async () => {
       const realTrades = await fetchRealTrades();
-      if (realTrades.length > 0) {
-        this.recentTrades.set(symbol, realTrades);
-        this._emit(channel, realTrades);
-      } else {
-        const synth = generateSyntheticTrades();
-        this.recentTrades.set(symbol, synth);
-        this._emit(channel, synth);
-      }
+      this.recentTrades.set(symbol, realTrades);
+      this._emit(channel, realTrades);
     };
 
     init();
 
     const interval = setInterval(async () => {
-      if (hasRealData) {
-        const fresh = await fetchRealTrades();
-        if (fresh.length > 0) {
-          const existing = this.recentTrades.get(symbol) || [];
-          const existingIds = new Set(existing.map(t => t.id));
-          const newTrades = fresh.filter(t => !existingIds.has(t.id));
-          if (newTrades.length > 0) {
-            const merged = [...newTrades, ...existing].slice(0, 100);
-            this.recentTrades.set(symbol, merged);
-            this._emit(channel, newTrades);
-          }
-        }
-      } else {
-        const currentPair = this.tradingPairs.get(symbol);
-        if (!currentPair) return;
-        const trade: Trade = {
-          id: generateId(),
-          price: currentPair.price + (Math.random() - 0.5) * currentPair.price * 0.0001,
-          quantity: Math.random() * 0.5 + 0.001,
-          side: Math.random() > 0.5 ? 'buy' : 'sell',
-          timestamp: Date.now(),
-        };
-        const trades = this.recentTrades.get(symbol) || [];
-        this.recentTrades.set(symbol, [trade, ...trades.slice(0, 99)]);
-        this._emit(channel, [trade]);
+      const fresh = await fetchRealTrades();
+      if (fresh.length === 0) return;
+      const existing = this.recentTrades.get(symbol) || [];
+      const existingIds = new Set(existing.map(t => t.id));
+      const newTrades = fresh.filter(t => !existingIds.has(t.id));
+      if (newTrades.length > 0) {
+        const merged = [...newTrades, ...existing].slice(0, 100);
+        this.recentTrades.set(symbol, merged);
+        this._emit(channel, newTrades);
       }
-    }, hasRealData ? 3000 : 800 + Math.random() * 1200);
+    }, 3000);
 
     this.intervals.set(channel, interval);
   }

@@ -71,6 +71,7 @@ export function LandingHero() {
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         >
           {/* Badge */}
+          {isEnabled('ENABLE_FUTURES') && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -84,6 +85,7 @@ export function LandingHero() {
               New: Futures trading now live with up to 100x leverage
             </span>
           </motion.div>
+          )}
 
           {/* Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-display font-bold text-white mb-6 tracking-tight">

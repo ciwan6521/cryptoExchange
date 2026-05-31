@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Twitter, Github, MessageCircle, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConnectionDot } from '@/components/trading/ConnectionStatus';
+import { isEnabled } from '@/lib/feature-flags';
 
 // ============================================
 // Footer Component
@@ -14,22 +15,19 @@ import { ConnectionDot } from '@/components/trading/ConnectionStatus';
 
 const footerLinks = {
   products: [
-    { name: 'Spot Trading', href: '/trade' },
-    { name: 'Futures', href: '/futures' },
+    { name: 'Spot Trading', href: '/trade/BTC-USDT' },
+    ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures' }] : []),
     { name: 'Staking', href: '/earn' },
-    { name: 'API', href: '/docs/api' },
+    { name: 'Markets', href: '/markets/spot' },
   ],
   company: [
-    { name: 'About', href: '/about' },
-    { name: 'Careers', href: '/careers' },
-    { name: 'Press', href: '/press' },
-    { name: 'Blog', href: '/blog' },
+    { name: 'About', href: '/' },
+    { name: 'FAQ', href: '/#faq' },
   ],
   support: [
     { name: 'Help Center', href: '/help' },
-    { name: 'Contact', href: '/contact' },
+    { name: 'Contact', href: 'mailto:support@crypto4pro.io' },
     { name: 'Status', href: '/status' },
-    { name: 'Bug Bounty', href: '/security' },
   ],
   legal: [
     { name: 'Terms of Service', href: '/legal/terms' },
@@ -156,12 +154,21 @@ export const Footer: React.FC<FooterProps> = ({ variant = 'full' }) => {
             <ul className="space-y-3">
               {footerLinks.support.map((link) => (
                 <li key={link.name}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-gray-400 hover:text-white transition-colors"
-                  >
-                    {link.name}
-                  </Link>
+                  {link.href.startsWith('mailto:') ? (
+                    <a
+                      href={link.href}
+                      className="text-sm text-gray-400 hover:text-white transition-colors"
+                    >
+                      {link.name}
+                    </a>
+                  ) : (
+                    <Link
+                      href={link.href}
+                      className="text-sm text-gray-400 hover:text-white transition-colors"
+                    >
+                      {link.name}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>

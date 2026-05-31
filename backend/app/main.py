@@ -72,6 +72,7 @@ from app.api.webhooks.pay4pro import router as pay4pro_webhook_router
 from app.api.deposits import router as deposits_router
 from app.api.kyc import router as kyc_router
 from app.api.staking import router as staking_router
+from app.api.leverage import router as leverage_router
 from app.services.market_data import get_market_data_service
 
 
@@ -155,6 +156,7 @@ app.include_router(pay4pro_webhook_router)
 app.include_router(deposits_router)
 app.include_router(kyc_router)
 app.include_router(staking_router)
+app.include_router(leverage_router)
 
 # Register routers — Admin
 app.include_router(admin_auth_router)

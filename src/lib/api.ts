@@ -685,6 +685,88 @@ export const stakingApi = {
 };
 
 // ============================================
+// Leverage / Futures API
+// ============================================
+
+export interface LeveragePairItem {
+  symbol: string;
+  base_asset: string;
+  quote_asset: string;
+}
+
+export interface LeverageConfigResponse {
+  enabled: boolean;
+  max_leverage: number;
+  min_margin_usdt: string;
+  maintenance_margin_rate: string;
+  pairs: LeveragePairItem[];
+}
+
+export interface LeveragePositionItem {
+  id: string;
+  symbol: string;
+  base_asset: string;
+  quote_asset: string;
+  side: string;
+  leverage: number;
+  margin_usdt: string;
+  notional_usdt: string;
+  quantity: string;
+  entry_price: string;
+  liquidation_price: string;
+  mark_price: string | null;
+  unrealized_pnl: string | null;
+  roi_percent: string | null;
+  status: string;
+  opened_at: string;
+  closed_at: string | null;
+  close_price: string | null;
+  realized_pnl: string | null;
+}
+
+export interface LeveragePreviewResponse {
+  symbol: string;
+  base_asset: string;
+  mark_price: string;
+  notional_usdt: string;
+  quantity: string;
+  liquidation_price: string;
+  leverage: number;
+  margin_usdt: string;
+  side: string;
+}
+
+export const leverageApi = {
+  getConfig: () =>
+    request<LeverageConfigResponse>('/api/leverage/config'),
+
+  getPositions: () =>
+    request<{ positions: LeveragePositionItem[]; open_count: number }>('/api/leverage/positions'),
+
+  preview: (params: { symbol: string; side: string; leverage: number; margin_usdt: string }) => {
+    const qs = new URLSearchParams({
+      symbol: params.symbol,
+      side: params.side,
+      leverage: String(params.leverage),
+      margin_usdt: params.margin_usdt,
+    });
+    return request<LeveragePreviewResponse>(`/api/leverage/preview?${qs}`);
+  },
+
+  open: (data: { symbol: string; side: string; leverage: number; margin_usdt: string }) =>
+    request<{ ok: boolean; position: LeveragePositionItem }>(
+      '/api/leverage/open',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  close: (positionId: string) =>
+    request<{ ok: boolean; position: LeveragePositionItem }>(
+      `/api/leverage/positions/${positionId}/close`,
+      { method: 'POST' },
+    ),
+};
+
+// ============================================
 // CMS API
 // ============================================
 

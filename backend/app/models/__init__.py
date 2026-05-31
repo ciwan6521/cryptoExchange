@@ -8,6 +8,7 @@ from app.models.cms import CMSContent, SystemFlag, AuditLog
 from app.models.supported_asset import SupportedAsset
 from app.models.deposit_method import DepositMethod
 from app.models.staking import StakingProduct, StakingPeriod, StakingPosition
+from app.models.leverage import LeveragePosition
 
 __all__ = [
     "User", "UserSession", "AdminUser",
@@ -19,4 +20,5 @@ __all__ = [
     "SupportedAsset",
     "DepositMethod",
     "StakingProduct", "StakingPeriod", "StakingPosition",
+    "LeveragePosition",
 ]

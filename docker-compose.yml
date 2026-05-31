@@ -69,6 +69,9 @@ services:
       - ALLOWED_ORIGINS=["https://crypto4pro.io","https://www.crypto4pro.io"]
       - RATE_LIMIT_PER_MINUTE=60
       - ENABLE_BLOCKCHAIN_WALLET=false
+      - ENABLE_FUTURES=true
+      - LEVERAGE_MAX=100
+      - LEVERAGE_MIN_MARGIN_USDT=10
       - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD:-}
       # Pay4Pro Integration
       - PAY4PRO_BASE_URL=${PAY4PRO_BASE_URL:-}
@@ -174,6 +177,7 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_BACKEND_URL=http://api:8000
+        - NEXT_PUBLIC_ENABLE_FUTURES=true
     container_name: c4p-web
     restart: unless-stopped
     depends_on:

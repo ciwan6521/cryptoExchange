@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { IconButton } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
+import { isEnabled } from '@/lib/feature-flags';
 
 // ============================================
 // Sidebar Component
@@ -35,6 +36,7 @@ interface SidebarProps {
 const mainNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Trade', href: '/trade/BTC-USDT', icon: LineChart },
+  ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures', icon: TrendingUp }] : []),
   { name: 'Wallet', href: '/wallet', icon: Wallet },
   { name: 'Earn', href: '/earn', icon: TrendingUp },
   { name: 'Rewards', href: '/rewards', icon: Gift },

@@ -36,7 +36,7 @@ const features = [
     icon: LineChart,
     title: 'Advanced Trading',
     description:
-      'Professional tools including limit orders, stop-loss, and margin trading up to 100x.',
+      'Professional tools including limit orders, market orders, staking, and USDT-margined futures up to 100x.',
     color: 'from-blue-500 to-indigo-500',
   },
   {

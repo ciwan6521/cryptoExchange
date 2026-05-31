@@ -152,6 +152,8 @@ export const Orderbook: React.FC<OrderbookProps> = ({
       </div>
     );
   }
+
+  const isEmpty = orderbook.asks.length === 0 && orderbook.bids.length === 0;
   
   return (
     <div className="h-full flex flex-col">
@@ -161,11 +163,21 @@ export const Orderbook: React.FC<OrderbookProps> = ({
           <h3 className="text-sm font-medium text-white">Order Book</h3>
           <DataDelayedBadge />
         </div>
-        <span className="text-xs text-gray-500">
-          Spread: {formatPrice(orderbook.spread)} ({orderbook.spreadPercentage.toFixed(3)}%)
-        </span>
+        {!isEmpty && (
+          <span className="text-xs text-gray-500">
+            Spread: {formatPrice(orderbook.spread)} ({orderbook.spreadPercentage.toFixed(3)}%)
+          </span>
+        )}
       </div>
-      
+
+      {isEmpty ? (
+        <div className="flex-1 flex items-center justify-center p-6 text-center">
+          <p className="text-sm text-gray-500">
+            No open orders in the book yet. Place a limit order to add liquidity.
+          </p>
+        </div>
+      ) : (
+        <>
       {/* Column headers */}
       <div className="grid grid-cols-3 gap-2 px-3 py-1.5 text-xs text-gray-500 border-b border-glass-border">
         <span>Price</span>
@@ -221,6 +233,8 @@ export const Orderbook: React.FC<OrderbookProps> = ({
           ))}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };
