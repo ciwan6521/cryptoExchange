@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   ArrowUpRight,
@@ -10,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Download,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { Card, CardHeader, Button, Badge, Skeleton } from '@/components/ui';
@@ -17,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { toFixedWithCommas } from '@/lib/decimal';
 import { useAuthStore } from '@/stores/auth-store';
 import { ledgerApi, type LedgerEntry, ApiError } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 // ============================================
 // Ledger History Page
@@ -39,7 +42,10 @@ const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
 
 const PAGE_SIZE = 20;
 
-export default function LedgerPage() {
+function LedgerContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { t } = useI18n();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
@@ -71,8 +77,51 @@ export default function LedgerPage() {
   }, [isAuthenticated, page, categoryFilter]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/auth/login');
+    }
+  }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    const cat = searchParams.get('category');
+    if (cat) setCategoryFilter(cat);
+  }, [searchParams]);
+
+  const exportCsv = useCallback(() => {
+    if (entries.length === 0) return;
+    const headers = ['Date', 'Type', 'Category', 'Asset', 'Amount', 'Balance After', 'Description'];
+    const rows = entries.map((entry) => {
+      const isCredit = entry.entry_type === 'credit';
+      const catConfig = CATEGORY_LABELS[entry.category] || { label: entry.category };
+      return [
+        new Date(entry.created_at).toISOString(),
+        isCredit ? 'Credit' : 'Debit',
+        catConfig.label,
+        entry.asset,
+        `${isCredit ? '+' : '-'}${entry.amount}`,
+        entry.balance_after,
+        entry.description || '',
+      ];
+    });
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ledger-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [entries]);
+
+  useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -118,6 +167,9 @@ export default function LedgerPage() {
             </div>
             <Button variant="ghost" size="sm" onClick={fetchEntries} icon={<RefreshCw className="w-3.5 h-3.5" />}>
               Refresh
+            </Button>
+            <Button variant="secondary" size="sm" onClick={exportCsv} disabled={entries.length === 0} icon={<Download className="w-3.5 h-3.5" />}>
+              {t('common.exportCsv')}
             </Button>
             <span className="text-xs text-gray-500 ml-auto">
               {total} total entries
@@ -237,5 +289,17 @@ export default function LedgerPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function LedgerPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-surface-500 flex items-center justify-center text-gray-500 text-sm">
+        Loading ledger…
+      </div>
+    }>
+      <LedgerContent />
+    </Suspense>
   );
 }

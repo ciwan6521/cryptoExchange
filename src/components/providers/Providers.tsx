@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { getWebSocket } from '@/lib/websocket';
+import { getWebSocket, connectUserChannel, disconnectUserChannel } from '@/lib/websocket';
 import { useTradingStore } from '@/stores/trading-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAdminStore } from '@/stores/admin-store';
@@ -9,6 +9,7 @@ import { marketApi } from '@/lib/api';
 import { MaintenanceGuard } from '@/components/layout/MaintenanceGuard';
 import { AnnouncementBar, MaintenanceNoticeBar, CMSPopup } from '@/components/layout/CMSRenderer';
 import { I18nProvider } from '@/lib/i18n';
+import { ThemeProvider } from '@/lib/theme';
 
 // ============================================
 // App Providers
@@ -17,6 +18,8 @@ import { I18nProvider } from '@/lib/i18n';
 // ============================================
 
 export const Providers: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
   useEffect(() => {
     // Restore auth session from httpOnly cookie
     useAuthStore.getState().restoreSession();
@@ -40,28 +43,33 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({ children })
       console.error('[Providers] WebSocket connection failed:', err);
     });
 
-    // Detect mobile and set restriction flag
-    const checkMobile = () => {
-      const isMobile = window.innerWidth < 768;
-      useTradingStore.getState().setMobileTradeRestricted(isMobile);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
+    // Mobile trading is fully supported — no restriction banner
+    useTradingStore.getState().setMobileTradeRestricted(false);
 
     return () => {
-      window.removeEventListener('resize', checkMobile);
       ws.disconnect();
     };
   }, []);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      connectUserChannel();
+    } else {
+      disconnectUserChannel();
+    }
+    return () => disconnectUserChannel();
+  }, [isAuthenticated]);
+
   return (
-    <I18nProvider>
-      <MaintenanceGuard>
-        <AnnouncementBar />
-        <MaintenanceNoticeBar />
-        {children}
-        <CMSPopup />
-      </MaintenanceGuard>
-    </I18nProvider>
+    <ThemeProvider>
+      <I18nProvider>
+        <MaintenanceGuard>
+          <AnnouncementBar />
+          <MaintenanceNoticeBar />
+          {children}
+          <CMSPopup />
+        </MaintenanceGuard>
+      </I18nProvider>
+    </ThemeProvider>
   );
 };

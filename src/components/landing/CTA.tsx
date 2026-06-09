@@ -74,7 +74,7 @@ export const CTA: React.FC = () => {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="mt-16 relative"
         >
-          {/* Mock trading interface preview */}
+          {/* Trading interface preview */}
           <div className="relative mx-auto max-w-3xl">
             <div className="aspect-[16/9] rounded-2xl bg-surface-100 border border-glass-border overflow-hidden shadow-2xl">
               {/* Header bar */}

@@ -3,7 +3,9 @@ Dependency injection for FastAPI routes.
 Provides: database sessions, current user, current admin, ledger service.
 """
 
+import hashlib
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status, Request, Cookie
@@ -13,10 +15,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User, AdminUser
+from app.models.platform import UserApiKey
 from app.utils.security import decode_token
 from app.services.ledger_service import LedgerService
 
 security = HTTPBearer(auto_error=False)
+
+
+def _hash_api_key(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+async def _authenticate_api_key(raw_key: str, db: AsyncSession) -> User:
+    """Validate X-API-Key header and return the owning user."""
+    if not raw_key or not raw_key.startswith("c4p_"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key format")
+
+    key_hash = _hash_api_key(raw_key)
+    result = await db.execute(
+        select(UserApiKey).where(UserApiKey.key_hash == key_hash, UserApiKey.is_active == True)
+    )
+    api_key = result.scalar_one_or_none()
+    if not api_key:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+
+    user_result = await db.execute(select(User).where(User.id == api_key.user_id))
+    user = user_result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+
+    api_key.last_used_at = datetime.now(timezone.utc)
+    await db.commit()
+    return user
 
 
 async def get_current_user(
@@ -24,7 +54,11 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Extract and validate user from httpOnly cookie (primary) or Bearer header (fallback)."""
+    """Authenticate via JWT (cookie/Bearer) or X-API-Key header."""
+    api_key = request.headers.get("X-API-Key") or request.headers.get("x-api-key")
+    if api_key:
+        return await _authenticate_api_key(api_key.strip(), db)
+
     token = None
 
     # 1. Try httpOnly cookie first
@@ -56,6 +90,36 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
 
     return user
+
+
+def require_api_permission(permission: str):
+    """Require API key to include a permission (JWT sessions bypass this check)."""
+    async def checker(
+        request: Request,
+        user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        api_key = request.headers.get("X-API-Key") or request.headers.get("x-api-key")
+        if not api_key:
+            return user
+
+        key_hash = _hash_api_key(api_key.strip())
+        result = await db.execute(
+            select(UserApiKey).where(UserApiKey.key_hash == key_hash, UserApiKey.is_active == True)
+        )
+        key_row = result.scalar_one_or_none()
+        if not key_row:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+
+        perms = {p.strip() for p in key_row.permissions.split(",") if p.strip()}
+        if permission not in perms:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"API key requires '{permission}' permission",
+            )
+        return user
+
+    return checker
 
 
 async def get_current_admin(

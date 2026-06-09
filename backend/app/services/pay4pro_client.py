@@ -43,6 +43,13 @@ class Pay4ProBalance:
 
 
 @dataclass
+class Pay4ProHotWalletBalance:
+    asset: str
+    network: str
+    balance: Decimal
+
+
+@dataclass
 class Pay4ProChain:
     name: str
     display_name: str
@@ -199,6 +206,39 @@ class Pay4ProClient:
             user_id, chain, wallet.address,
         )
         return wallet
+
+    async def get_hot_wallet_balance(self) -> list[Pay4ProHotWalletBalance]:
+        """
+        Get master hot wallet balances across assets and networks.
+
+        GET /api/wallet/hot-balances
+        Returns empty list on failure or when Pay4Pro is not configured.
+        """
+        if not self.base_url:
+            return []
+
+        try:
+            data = await self._request("GET", "/api/wallet/hot-balances")
+        except Pay4ProError as exc:
+            logger.warning("Failed to fetch hot wallet balances: %s", exc)
+            return []
+
+        rows = data if isinstance(data, list) else data.get("balances", data.get("data", []))
+        result: list[Pay4ProHotWalletBalance] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            asset = row.get("asset") or row.get("currency") or row.get("token", "")
+            network = row.get("network") or row.get("chain", "")
+            balance_raw = row.get("balance", row.get("amount", "0"))
+            if not asset:
+                continue
+            result.append(Pay4ProHotWalletBalance(
+                asset=str(asset).upper(),
+                network=str(network).upper() if network else "",
+                balance=Decimal(str(balance_raw)),
+            ))
+        return result
 
     async def get_wallet_balance(self, user_id: str, chain: str = "bsc") -> Pay4ProBalance:
         """

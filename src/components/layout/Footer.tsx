@@ -3,10 +3,11 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Twitter, Github, MessageCircle, Mail } from 'lucide-react';
+import { Twitter, MessageCircle, Mail, Instagram } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConnectionDot } from '@/components/trading/ConnectionStatus';
 import { isEnabled } from '@/lib/feature-flags';
+import { t4proIco } from '@/lib/t4pro-ico';
 
 // ============================================
 // Footer Component
@@ -17,6 +18,8 @@ const footerLinks = {
   products: [
     { name: 'Spot Trading', href: '/trade/BTC-USDT' },
     ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures' }] : []),
+    { name: 'Convert', href: '/convert' },
+    { name: 'P2P', href: '/p2p' },
     { name: 'Staking', href: '/earn' },
     { name: 'T4PRO ICO', href: '/ico/t4pro' },
     { name: 'Markets', href: '/markets/spot' },
@@ -38,10 +41,10 @@ const footerLinks = {
 };
 
 const socialLinks = [
-  { name: 'Twitter', href: 'https://twitter.com', icon: Twitter },
-  { name: 'GitHub', href: 'https://github.com', icon: Github },
-  { name: 'Discord', href: 'https://discord.com', icon: MessageCircle },
-  { name: 'Email', href: 'mailto:support@crypto4.io', icon: Mail },
+  { name: 'Twitter', href: t4proIco.social.twitter, icon: Twitter },
+  { name: 'Telegram', href: t4proIco.social.telegram, icon: MessageCircle },
+  { name: 'Instagram', href: t4proIco.social.instagram, icon: Instagram },
+  { name: 'Email', href: 'mailto:support@crypto4pro.io', icon: Mail },
 ];
 
 interface FooterProps {

@@ -19,7 +19,7 @@ import {
 import { Header, Sidebar } from '@/components/layout';
 import { Button, Card, Skeleton } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import { campaignApi, type CampaignItem, type CampaignClaimItem, ApiError } from '@/lib/api';
+import { campaignApi, referralHistoryApi, type CampaignItem, type CampaignClaimItem, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 
 // ============================================
@@ -183,6 +183,13 @@ export default function RewardsPage() {
 
   const [campaigns, setCampaigns] = useState<CampaignItem[]>([]);
   const [claims, setClaims] = useState<CampaignClaimItem[]>([]);
+  const [referrals, setReferrals] = useState<Array<{
+    user_id: string;
+    username: string;
+    email: string;
+    kyc_status: string;
+    joined_at: string | null;
+  }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -196,11 +203,17 @@ export default function RewardsPage() {
       // Fetch user claims if authenticated
       if (isAuthenticated) {
         try {
-          const claimRes = await campaignApi.getMyClaims();
+          const [claimRes, referralRes] = await Promise.all([
+            campaignApi.getMyClaims(),
+            referralHistoryApi.getHistory(),
+          ]);
           setClaims(claimRes.claims);
+          setReferrals(referralRes.referrals || []);
         } catch {
-          // Claims are optional — don't fail the page
+          // Claims/referrals are optional — don't fail the page
         }
+      } else {
+        setReferrals([]);
       }
     } catch (e) {
       const msg = e instanceof ApiError ? e.detail : 'Failed to load campaigns';
@@ -300,6 +313,38 @@ export default function RewardsPage() {
                   <CampaignCard key={campaign.id} campaign={campaign} claims={claims} index={i} />
                 ))}
               </div>
+
+              {isAuthenticated && referrals.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="mt-8"
+                >
+                  <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-brand-400" />
+                    Your Referrals ({referrals.length})
+                  </h2>
+                  <Card padding="none">
+                    <div className="divide-y divide-glass-border">
+                      {referrals.map((ref) => (
+                        <div key={ref.user_id} className="px-4 py-3 flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-white">{ref.username}</p>
+                            <p className="text-xs text-gray-500">{ref.email}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-400 capitalize">{ref.kyc_status}</p>
+                            <p className="text-[10px] text-gray-600">
+                              {ref.joined_at ? new Date(ref.joined_at).toLocaleDateString() : '—'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
             </>
           )}
         </div>

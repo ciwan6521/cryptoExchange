@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.wallet import Deposit, Withdrawal
 from app.models.cms import AuditLog
+from app.events.bus import EventBus
 from app.services.ledger_service import LedgerService
 from app.services.pay4pro_client import get_pay4pro_client
 
@@ -243,6 +244,18 @@ async def _handle_deposit_confirmed(
     )
     db.add(audit)
     await db.commit()
+
+    if entry:
+        try:
+            bus = await EventBus.get_instance()
+            await bus.publish_deposit_completed(
+                user_id=str(user_id),
+                deposit_id=str(deposit.id),
+                amount=str(credit_amount),
+                asset=currency,
+            )
+        except Exception:
+            logger.exception("Failed to publish deposit_completed event for %s", deposit.id)
 
     return {
         "ok": True,

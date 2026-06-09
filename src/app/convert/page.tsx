@@ -3,19 +3,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowDownUp, Loader2, ChevronDown, Wallet, RefreshCw,
+  ArrowDownUp, Loader2, ChevronDown, Wallet, RefreshCw, AlertTriangle,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { KycBanner } from '@/components/common/KycBanner';
 import { Button, CoinIcon } from '@/components/ui';
 import { cn, formatNumber } from '@/lib/utils';
 import { convertApi, ApiError } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBalanceStore } from '@/stores/balance-store';
 import { toast } from 'sonner';
 
 export default function ConvertPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { t } = useI18n();
   const { isAuthenticated, user } = useAuthStore();
   const { balances, fetchBalances } = useBalanceStore();
 
@@ -29,21 +31,27 @@ export default function ConvertPage() {
     fee_usd: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [converting, setConverting] = useState(false);
   const [pickerOpen, setPickerOpen] = useState<'from' | 'to' | null>(null);
 
   const loadAssets = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await convertApi.getAssets();
-      const list = res.assets?.length ? res.assets : ['USDT', 'BTC', 'ETH'];
+      if (!res.assets?.length) {
+        throw new ApiError(500, 'No convert assets available');
+      }
+      const list = res.assets;
       setAssets(list);
       if (!list.includes(fromAsset)) setFromAsset(list[0]);
-      if (!list.includes(toAsset)) setToAsset(list.find(a => a !== list[0]) || list[0]);
+      if (!list.includes(toAsset)) setToAsset(list.find((a: string) => a !== list[0]) || list[0]);
       if (isAuthenticated) await fetchBalances();
-    } catch {
-      setAssets(['USDT', 'BTC', 'ETH']);
+    } catch (err) {
+      setAssets([]);
+      setLoadError(err instanceof ApiError ? err.detail : 'Failed to load convert assets');
     } finally {
       setLoading(false);
     }
@@ -193,10 +201,10 @@ export default function ConvertPage() {
         >
           <div className="inline-flex items-center gap-2 text-brand-400 text-sm font-medium mb-2">
             <ArrowDownUp className="w-4 h-4" />
-            Instant Convert
+            {t('convert.title')}
           </div>
-          <h1 className="text-2xl font-display font-bold text-white mb-1">Swap Assets</h1>
-          <p className="text-sm text-gray-400">Convert between supported assets at live rates</p>
+          <h1 className="text-2xl font-display font-bold text-white mb-1">{t('convert.title')}</h1>
+          <p className="text-sm text-gray-400">{t('convert.subtitle')}</p>
         </motion.div>
 
         <motion.div
@@ -208,6 +216,12 @@ export default function ConvertPage() {
           {loading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+            </div>
+          ) : loadError ? (
+            <div className="text-center py-12 space-y-3">
+              <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
+              <p className="text-sm text-red-400">{loadError}</p>
+              <button onClick={loadAssets} className="text-sm text-brand-400 hover:underline">Retry</button>
             </div>
           ) : (
             <>

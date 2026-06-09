@@ -58,15 +58,21 @@ from app.api.admin.orders import router as admin_orders_router
 from app.api.admin.wallets_admin import router as admin_wallets_ops_router
 from app.api.admin.kyc import router as admin_kyc_router
 from app.api.admin.staking import router as admin_staking_router
+from app.api.admin.launchpad import router as admin_launchpad_router
+from app.api.admin.p2p import router as admin_p2p_router
+from app.api.admin.referral import router as admin_referral_router
+from app.api.admin.options import router as admin_options_router
 
 # User withdrawal + orders routers
 from app.api.withdrawals import router as withdrawal_router
 from app.api.orders import router as orders_router
 from app.api.ws import router as ws_router
+from app.api.ws_user import router as ws_user_router
 from app.api.wallet import router as wallet_router
 
 # Webhooks
 from app.api.webhooks.pay4pro import router as pay4pro_webhook_router
+from app.api.webhooks.kyc_provider import router as kyc_webhook_router
 
 # User deposits + KYC
 from app.api.deposits import router as deposits_router
@@ -85,12 +91,32 @@ from app.api.oauth import router as oauth_router
 from app.services.market_data import get_market_data_service
 
 
+def _validate_production_secrets() -> None:
+    """Refuse startup in production when default secrets are still in use."""
+    if settings.APP_ENV != "production":
+        return
+
+    secret_fields = {
+        "SECRET_KEY": settings.SECRET_KEY,
+        "JWT_SECRET_KEY": settings.JWT_SECRET_KEY,
+        "ADMIN_JWT_SECRET_KEY": settings.ADMIN_JWT_SECRET_KEY,
+    }
+    insecure = [name for name, value in secret_fields.items() if "change-me" in value.lower()]
+    if insecure:
+        msg = f"Production startup blocked — insecure default secrets: {', '.join(insecure)}"
+        logger.critical(msg)
+        raise RuntimeError(msg)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    # Startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    _validate_production_secrets()
+
+    # Startup — auto-create tables only in development (production uses SQL migrations)
+    if settings.APP_ENV != "production":
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
     
     # Initialize event bus
     await EventBus.get_instance()
@@ -129,7 +155,7 @@ app.add_middleware(
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key"],
 )
 
 
@@ -160,8 +186,10 @@ app.include_router(trading_router)
 app.include_router(withdrawal_router)
 app.include_router(orders_router)
 app.include_router(ws_router)
+app.include_router(ws_user_router)
 app.include_router(wallet_router)
 app.include_router(pay4pro_webhook_router)
+app.include_router(kyc_webhook_router)
 app.include_router(deposits_router)
 app.include_router(kyc_router)
 app.include_router(staking_router)
@@ -191,6 +219,10 @@ app.include_router(admin_orders_router)
 app.include_router(admin_wallets_ops_router)
 app.include_router(admin_kyc_router)
 app.include_router(admin_staking_router)
+app.include_router(admin_launchpad_router)
+app.include_router(admin_p2p_router)
+app.include_router(admin_referral_router)
+app.include_router(admin_options_router)
 
 
 @app.get("/api/health")

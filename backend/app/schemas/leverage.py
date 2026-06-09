@@ -8,6 +8,14 @@ class OpenLeverageRequest(BaseModel):
     margin_usdt: str
 
 
+class PartialCloseRequest(BaseModel):
+    percent: int = Field(default=100, ge=1, le=100)
+
+
+class AddMarginRequest(BaseModel):
+    margin_usdt: str
+
+
 class LeveragePositionResponse(BaseModel):
     id: str
     symbol: str

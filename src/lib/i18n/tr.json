@@ -2,10 +2,71 @@
   "nav": {
     "dashboard": "Panel",
     "trade": "Al-Sat",
+    "futures": "Vadeli",
     "convert": "Dönüştür",
     "p2p": "P2P",
+    "earn": "Kazan",
+    "ico": "T4PRO ICO",
     "wallet": "Cüzdan",
-    "settings": "Ayarlar"
+    "rewards": "Ödüller",
+    "markets": "Piyasalar",
+    "spot": "Spot",
+    "options": "Opsiyon",
+    "settings": "Ayarlar",
+    "notifications": "Bildirimler",
+    "searchPlaceholder": "Piyasa ara...",
+    "login": "Giriş",
+    "signup": "Kayıt Ol",
+    "signOut": "Çıkış",
+    "ledger": "Defter Geçmişi"
+  },
+  "sidebar": {
+    "main": "Ana",
+    "account": "Hesap",
+    "signOut": "Çıkış"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "subtitle": "Tekrar hoş geldiniz! Portföyünüze genel bir bakış.",
+    "totalValue": "Toplam Portföy Değeri",
+    "yourAssets": "Varlıklarınız",
+    "viewAll": "Tümünü Gör",
+    "openOrders": "Açık Emirler",
+    "markets": "Piyasalar",
+    "quickStats": "Hızlı İstatistikler",
+    "pnl24h": "24s K/Z",
+    "deposit": "Yatır",
+    "withdraw": "Çek",
+    "trade": "Al-Sat",
+    "earn": "Kazan"
+  },
+  "wallet": {
+    "title": "Cüzdan",
+    "subtitle": "Kripto portföyünüzü yönetin",
+    "totalValue": "Toplam Portföy Değeri",
+    "withdrawHistory": "Çekim Geçmişi",
+    "asset": "Varlık",
+    "balance": "Bakiye",
+    "locked": "Kilitli",
+    "price": "Fiyat (USD)",
+    "value": "Değer (USD)",
+    "pricesNote": "Fiyatlar gerçek zamanlı güncellenir."
+  },
+  "trade": {
+    "searchMarkets": "Piyasa ara...",
+    "browseMarkets": "Tüm piyasalara göz at →",
+    "pairDisabled": "Bu parite için işlem şu an devre dışı"
+  },
+  "futures": {
+    "title": "Vadeli İşlemler",
+    "fundingRate": "Fonlama Oranı",
+    "partialClose": "Kapatma %",
+    "closePosition": "Pozisyonu Kapat",
+    "disclaimer": "Sentetik USDT marjinli pozisyonlar — harici perpetual borsalara bağlı değildir."
+  },
+  "earn": {
+    "title": "Kazan",
+    "subtitle": "Staking ve ödüllerle kriptonuzu büyütün"
   },
   "common": {
     "loading": "Yükleniyor...",
@@ -13,7 +74,8 @@
     "retry": "Tekrar dene",
     "cancel": "İptal",
     "confirm": "Onayla",
-    "save": "Kaydet"
+    "save": "Kaydet",
+    "exportCsv": "CSV İndir"
   },
   "convert": {
     "title": "Anında Dönüştür",
@@ -28,9 +90,12 @@
   },
   "p2p": {
     "title": "P2P Pazar",
+    "subtitle": "Diğer kullanıcılarla doğrudan kripto alın ve satın",
     "buy": "Al",
     "sell": "Sat",
-    "myOrders": "Emirlerim"
+    "myOrders": "Emirlerim",
+    "marketplace": "Pazar",
+    "createAd": "İlan Oluştur"
   },
   "options": {
     "title": "Opsiyon İşlemleri",
@@ -41,10 +106,50 @@
     "duration": "Süre",
     "open": "Pozisyon Aç",
     "positions": "Açık Pozisyonlar",
-    "close": "Kapat"
+    "close": "Kapat",
+    "disclaimer": "Sentetik opsiyonlar — primler ve uzlaşma defter tabanlıdır, borsada işlem gören sözleşmeler değildir."
   },
   "language": {
     "en": "English",
     "tr": "Türkçe"
+  },
+  "help": {
+    "title": "Yardım Merkezi",
+    "subtitle": "Sık sorulan konular için hızlı bağlantılar.",
+    "tradingGuide": "İşlem Rehberi",
+    "tradingGuideDesc": "Spot işlem, emir türleri ve ücretler",
+    "futures": "Vadeli / Kaldıraç",
+    "futuresDesc": "100x'e kadar USDT marjinli pozisyonlar",
+    "ico": "T4PRO Token ICO",
+    "icoDesc": "Resmi token satışı — Telegram ve sosyal kanallara katılın",
+    "staking": "Staking (Kazan)",
+    "stakingDesc": "Yapılandırılmış ödül dönemleri için coin kilitleyin",
+    "kyc": "KYC Doğrulama",
+    "kycDesc": "İşlem, staking ve çekimler için gerekli",
+    "support": "Destek İletişim",
+    "supportDesc": "support@crypto4pro.io",
+    "seeAlso": "Ayrıca bakın",
+    "terms": "Kullanım Şartları",
+    "privacy": "Gizlilik Politikası"
+  },
+  "fees": {
+    "title": "Ücret Tablosu",
+    "subtitle": "Crypto4Pro — Son güncelleme: Mart 2026. Ücretler bu sayfada bildirimle değiştirilebilir.",
+    "spotTitle": "Spot işlem",
+    "spotDesc": "Spot maker ve taker ücretleri gerçekleşen işlemlere uygulanır. Etkin oranınız 30 günlük işlem hacminize ve VIP seviyenize bağlıdır.",
+    "type": "Tür",
+    "rate": "Oran",
+    "maker": "Maker",
+    "taker": "Taker",
+    "spotNote": "VIP indirimleri öncesi temel spot oranları. Maker emirleri likidite ekler; taker emirleri likidite kaldırır.",
+    "vipTitle": "VIP seviyeleri",
+    "vipDesc": "30 günlük spot işlem hacmi tüm paritelerde USD karşılığı olarak hesaplanır. Daha yüksek seviyeler daha düşük maker ve taker ücretleri açar.",
+    "tier": "Seviye",
+    "volume": "30 günlük hacim (USD)",
+    "withdrawTitle": "Çekim ücretleri",
+    "withdrawDesc": "Ağ ücretleri çekim başına alınır ve ağ yoğunluğuna göre ayarlanabilir. Çekim anında gösterilen tutarı her zaman onaylayın.",
+    "asset": "Varlık",
+    "network": "Ağ",
+    "fee": "Ücret"
   }
 }

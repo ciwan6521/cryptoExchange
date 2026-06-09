@@ -3,19 +3,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  BarChart3, TrendingUp, TrendingDown, Loader2, X, Clock,
+  BarChart3, TrendingUp, TrendingDown, Loader2, X, Clock, AlertTriangle,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { KycBanner } from '@/components/common/KycBanner';
 import { Button, CoinIcon } from '@/components/ui';
 import { cn, formatNumber, formatPrice } from '@/lib/utils';
-import { optionsApi, ApiError } from '@/lib/api';
+import { optionsApi, optionsAssetsApi, ApiError } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBalanceStore } from '@/stores/balance-store';
 import { useTickers } from '@/hooks';
 import { toast } from 'sonner';
 
-const ASSETS = ['BTC', 'ETH', 'SOL'];
 const DURATIONS = [
   { label: '7 days', value: 7 },
   { label: '14 days', value: 14 },
@@ -25,6 +25,7 @@ const DURATIONS = [
 
 export default function OptionsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { t } = useI18n();
   const { isAuthenticated, user } = useAuthStore();
   const { balances, fetchBalances } = useBalanceStore();
   const allTickers = useTickers();
@@ -39,6 +40,8 @@ export default function OptionsPage() {
   const [closingId, setClosingId] = useState<string | null>(null);
 
   const [asset, setAsset] = useState('BTC');
+  const [assets, setAssets] = useState<string[]>(['BTC', 'ETH', 'SOL']);
+  const [optionsDisclaimer, setOptionsDisclaimer] = useState('');
   const [optionType, setOptionType] = useState<'call' | 'put'>('call');
   const [strikePrice, setStrikePrice] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -53,6 +56,18 @@ export default function OptionsPage() {
     const b = balances.find(x => x.asset === 'USDT');
     return parseFloat(b?.available || '0');
   }, [balances]);
+
+  useEffect(() => {
+    optionsAssetsApi.getAssets()
+      .then((res) => {
+        if (res.assets?.length) {
+          setAssets(res.assets);
+          setAsset((current) => (res.assets.includes(current) ? current : res.assets[0]));
+        }
+        if (res.disclaimer) setOptionsDisclaimer(res.disclaimer);
+      })
+      .catch(() => {});
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -168,6 +183,13 @@ export default function OptionsPage() {
           <BarChart3 className="absolute -right-4 -bottom-4 w-32 h-32 text-purple-500/10" />
         </motion.div>
 
+        {(optionsDisclaimer || t('options.disclaimer')) && (
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-300">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <p>{optionsDisclaimer || t('options.disclaimer')}</p>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Open panel */}
           <div className="lg:col-span-1 rounded-xl border border-glass-border bg-surface-200 p-5 space-y-5">
@@ -175,8 +197,8 @@ export default function OptionsPage() {
 
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Asset</label>
-              <div className="flex gap-2">
-                {ASSETS.map(a => (
+              <div className="flex flex-wrap gap-2">
+                {assets.map(a => (
                   <button
                     key={a}
                     type="button"

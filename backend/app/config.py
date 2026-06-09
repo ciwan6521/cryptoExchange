@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     ALERT_WEBHOOK_URL: str = ""  # Slack/Discord webhook URL (empty = log only)
 
     # ── Seed Admin Passwords (initial setup only) ──
+    SEED_SUPER_ADMIN_EMAIL: str = ""
+    SEED_SUPER_ADMIN_USERNAME: str = "superadmin"
+    SEED_SUPER_ADMIN_PASSWORD: str = ""
     SEED_ADMIN_PASSWORD: str = ""
     SEED_OPERATOR_PASSWORD: str = ""
     SEED_FINANCE_PASSWORD: str = ""

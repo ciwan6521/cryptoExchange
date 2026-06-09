@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -21,6 +21,12 @@ import {
   CreditCard,
   Lock,
   ArrowUpFromLine,
+  ArrowDownToLine,
+  Rocket,
+  Menu,
+  X,
+  Gift,
+  LineChart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminStore, type AdminPermissions } from '@/stores/admin-store';
@@ -51,7 +57,9 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
       { name: 'Users', href: '/admin/users', icon: Users, permission: 'canManageUsers' },
       { name: 'KYC Requests', href: '/admin/kyc', icon: ScanFace, permission: 'canManageUsers' },
       { name: 'Withdrawals', href: '/admin/withdrawals', icon: ArrowUpFromLine, permission: 'canManageWallets' },
+      { name: 'Deposits', href: '/admin/deposits', icon: ArrowDownToLine, permission: 'canManageWallets' },
       { name: 'Balances', href: '/admin/balances', icon: Wallet, permission: 'canManageBalances' },
+      { name: 'P2P', href: '/admin/p2p', icon: Users, permission: 'canManageOrders' },
       { name: 'Orders & Trades', href: '/admin/orders', icon: ArrowLeftRight, permission: 'canManageOrders' },
       { name: 'Wallets', href: '/admin/wallets', icon: CreditCard, permission: 'canManageWallets' },
     ],
@@ -62,7 +70,10 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
       { name: 'Markets', href: '/admin/markets', icon: BarChart3, permission: 'canManageMarkets' },
       { name: 'System Flags', href: '/admin/flags', icon: Flag, permission: 'canManageFlags' },
       { name: 'Campaigns', href: '/admin/campaigns', icon: Megaphone, permission: 'canManageCampaigns' },
+      { name: 'Referrals', href: '/admin/referral', icon: Gift, permission: 'canManageCampaigns' },
+      { name: 'Options', href: '/admin/options', icon: LineChart, permission: 'canManageOrders' },
       { name: 'Staking', href: '/admin/staking', icon: Lock, permission: 'canManageCampaigns' },
+      { name: 'Launchpad', href: '/admin/launchpad', icon: Rocket, permission: 'canManageCampaigns' },
       { name: 'CMS', href: '/admin/cms', icon: FileText, permission: 'canManageCMS' },
     ],
   },
@@ -122,17 +133,42 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const permissions = getPermissions();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex">
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-60 bg-[#0f0f18] border-r border-white/[0.06] flex flex-col z-40">
+      <aside className={cn(
+        'fixed inset-y-0 left-0 w-60 bg-[#0f0f18] border-r border-white/[0.06] flex flex-col z-50 transition-transform duration-200',
+        'lg:translate-x-0',
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      )}>
         {/* Logo */}
-        <div className="h-12 px-4 flex items-center gap-2 border-b border-white/[0.06] shrink-0">
-          <div className="w-6 h-6 rounded bg-red-500/80 flex items-center justify-center">
-            <Shield className="w-3.5 h-3.5 text-white" />
+        <div className="h-12 px-4 flex items-center justify-between gap-2 border-b border-white/[0.06] shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 rounded bg-red-500/80 flex items-center justify-center shrink-0">
+              <Shield className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="text-sm font-semibold text-white truncate">Crypto4Pro Admin</span>
           </div>
-          <span className="text-sm font-semibold text-white">Crypto4Pro Admin</span>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-1 text-gray-500 hover:text-white"
+            aria-label="Close sidebar"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -159,6 +195,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       <Link
                         key={item.href}
                         href={item.href}
+                        onClick={() => setSidebarOpen(false)}
                         className={cn(
                           'flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors',
                           isActive
@@ -210,10 +247,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main content */}
-      <main className="ml-60 flex-1 min-h-screen">
+      <main className="flex-1 min-h-screen lg:ml-60">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 h-10 bg-[#0a0a0f]/90 backdrop-blur border-b border-white/[0.06] flex items-center px-4">
-          <p className="text-[11px] text-gray-600">
+        <header className="sticky top-0 z-30 h-10 bg-[#0a0a0f]/90 backdrop-blur border-b border-white/[0.06] flex items-center gap-3 px-4">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-1 text-gray-500 hover:text-white"
+            aria-label="Open menu"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+          <p className="text-[11px] text-gray-600 truncate">
             {pathname.replace('/admin', 'Admin').replace(/\//g, ' / ').replace(/^/, '')}
           </p>
         </header>

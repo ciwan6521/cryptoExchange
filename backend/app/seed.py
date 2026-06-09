@@ -14,11 +14,37 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.database import engine, Base, async_session_factory
-from app.models.user import AdminUser
+from app.models.user import AdminUser, User
+from app.models.ledger import Account
 from app.models.trading import TradingPair
 from app.models.cms import SystemFlag
 from app.models.supported_asset import SupportedAsset
+from app.models.staking import StakingProduct, StakingPeriod
 from app.utils.security import hash_password
+
+STAKING_PRODUCTS = [
+    {
+        "asset": "USDT",
+        "name": "USDT Flexible Earn",
+        "description": "Earn rewards on your USDT balance",
+        "min_stake": "10",
+        "periods": [
+            {"label": "7 Days", "duration_days": 7, "reward_percent": "2.5"},
+            {"label": "30 Days", "duration_days": 30, "reward_percent": "8.0"},
+            {"label": "90 Days", "duration_days": 90, "reward_percent": "15.0"},
+        ],
+    },
+    {
+        "asset": "ETH",
+        "name": "ETH Staking",
+        "description": "Stake ETH and earn passive rewards",
+        "min_stake": "0.01",
+        "periods": [
+            {"label": "14 Days", "duration_days": 14, "reward_percent": "3.0"},
+            {"label": "60 Days", "duration_days": 60, "reward_percent": "10.0"},
+        ],
+    },
+]
 
 
 # Admin passwords MUST come from environment variables — never hardcoded.
@@ -29,11 +55,11 @@ ADMIN_ACCOUNTS = [
     {"email": "viewer@crypto4.io", "username": "viewer", "password": os.environ.get("SEED_VIEWER_PASSWORD", ""), "role": "readonly"},
 ]
 
-# Hard-seeded SUPER_ADMIN — always created/updated on seed
+# Optional SUPER_ADMIN — only seeded when env vars are set
 SUPER_ADMIN = {
-    "email": "cihan@crypto4.io",
-    "username": "cihan",
-    "password": "Cihan!123.!",
+    "email": os.environ.get("SEED_SUPER_ADMIN_EMAIL", ""),
+    "username": os.environ.get("SEED_SUPER_ADMIN_USERNAME", "superadmin"),
+    "password": os.environ.get("SEED_SUPER_ADMIN_PASSWORD", ""),
     "role": "super_admin",
 }
 
@@ -80,6 +106,27 @@ TRADING_PAIRS = [
         "min_order_size": "0.01", "max_order_size": "999999",
         "min_notional": "10", "maker_fee": "0.001", "taker_fee": "0.001",
     },
+    {
+        "symbol": "BNB-USDT", "base_asset": "BNB", "quote_asset": "USDT",
+        "price_precision": 2, "quantity_precision": 4,
+        "tick_size": "0.01", "step_size": "0.0001",
+        "min_order_size": "0.0001", "max_order_size": "999999",
+        "min_notional": "10", "maker_fee": "0.001", "taker_fee": "0.001",
+    },
+    {
+        "symbol": "ADA-USDT", "base_asset": "ADA", "quote_asset": "USDT",
+        "price_precision": 4, "quantity_precision": 1,
+        "tick_size": "0.0001", "step_size": "0.1",
+        "min_order_size": "1", "max_order_size": "9999999",
+        "min_notional": "10", "maker_fee": "0.001", "taker_fee": "0.001",
+    },
+    {
+        "symbol": "TRX-USDT", "base_asset": "TRX", "quote_asset": "USDT",
+        "price_precision": 5, "quantity_precision": 1,
+        "tick_size": "0.00001", "step_size": "0.1",
+        "min_order_size": "1", "max_order_size": "9999999",
+        "min_notional": "10", "maker_fee": "0.001", "taker_fee": "0.001",
+    },
 ]
 
 SUPPORTED_ASSETS = [
@@ -93,6 +140,9 @@ SUPPORTED_ASSETS = [
     {"symbol": "TRX", "name": "TRON", "decimals": 6},
     {"symbol": "USDT", "name": "Tether", "decimals": 6},
 ]
+
+MM_EMAIL = os.environ.get("MARKET_MAKER_EMAIL", "mm@crypto4pro.io")
+MM_PASSWORD = os.environ.get("SEED_MM_PASSWORD", "")
 
 SYSTEM_FLAGS = {
     "trading_enabled": True,
@@ -110,25 +160,30 @@ async def seed():
         await conn.run_sync(Base.metadata.create_all)
 
     async with async_session_factory() as db:
-        # --- SUPER_ADMIN (always seeded) ---
-        existing = await db.execute(
-            select(AdminUser).where(AdminUser.email == SUPER_ADMIN["email"])
-        )
-        sa = existing.scalar_one_or_none()
-        if sa:
-            sa.password_hash = hash_password(SUPER_ADMIN["password"])
-            sa.role = SUPER_ADMIN["role"]
-            print(f"  [~] SUPER_ADMIN updated: {SUPER_ADMIN['email']}")
+        # --- SUPER_ADMIN (optional — requires env vars) ---
+        if not SUPER_ADMIN["email"] or not SUPER_ADMIN["password"]:
+            print("  [!] SKIPPED: SUPER_ADMIN — set SEED_SUPER_ADMIN_EMAIL and SEED_SUPER_ADMIN_PASSWORD")
+        elif len(SUPER_ADMIN["password"]) < 12:
+            print("  [!] SKIPPED: SUPER_ADMIN — password must be >= 12 chars")
         else:
-            sa = AdminUser(
-                email=SUPER_ADMIN["email"],
-                username=SUPER_ADMIN["username"],
-                password_hash=hash_password(SUPER_ADMIN["password"]),
-                role=SUPER_ADMIN["role"],
-                force_password_change=False,
+            existing = await db.execute(
+                select(AdminUser).where(AdminUser.email == SUPER_ADMIN["email"])
             )
-            db.add(sa)
-            print(f"  [+] SUPER_ADMIN created: {SUPER_ADMIN['email']}")
+            sa = existing.scalar_one_or_none()
+            if sa:
+                sa.password_hash = hash_password(SUPER_ADMIN["password"])
+                sa.role = SUPER_ADMIN["role"]
+                print(f"  [~] SUPER_ADMIN updated: {SUPER_ADMIN['email']}")
+            else:
+                sa = AdminUser(
+                    email=SUPER_ADMIN["email"],
+                    username=SUPER_ADMIN["username"],
+                    password_hash=hash_password(SUPER_ADMIN["password"]),
+                    role=SUPER_ADMIN["role"],
+                    force_password_change=False,
+                )
+                db.add(sa)
+                print(f"  [+] SUPER_ADMIN created: {SUPER_ADMIN['email']}")
 
         # --- Admin Accounts ---
         for acct in ADMIN_ACCOUNTS:
@@ -195,6 +250,61 @@ async def seed():
                 print(f"  [+] Asset: {asset_data['symbol']} ({asset_data['name']})")
             else:
                 print(f"  [=] Asset already exists: {asset_data['symbol']}")
+
+        # --- Market Maker bot user (optional) ---
+        if MM_PASSWORD and len(MM_PASSWORD) >= 12:
+            mm_result = await db.execute(select(User).where(User.email == MM_EMAIL))
+            mm_user = mm_result.scalar_one_or_none()
+            if not mm_user:
+                mm_user = User(
+                    email=MM_EMAIL,
+                    username="marketmaker",
+                    password_hash=hash_password(MM_PASSWORD),
+                    email_verified=True,
+                    is_verified=True,
+                    kyc_status="approved",
+                    trading_enabled=True,
+                )
+                db.add(mm_user)
+                await db.flush()
+                for asset in ("USDT", "BTC", "ETH", "SOL", "XRP", "DOGE"):
+                    db.add(Account(user_id=mm_user.id, asset=asset, available_balance=0, locked_balance=0))
+                print(f"  [+] Market maker user: {MM_EMAIL}")
+            else:
+                print(f"  [=] Market maker exists: {MM_EMAIL}")
+        else:
+            print("  [!] SKIPPED: market maker — set SEED_MM_PASSWORD (>=12 chars)")
+
+        # --- Staking Products ---
+        for prod_data in STAKING_PRODUCTS:
+            existing = await db.execute(
+                select(StakingProduct).where(
+                    StakingProduct.asset == prod_data["asset"],
+                    StakingProduct.name == prod_data["name"],
+                )
+            )
+            if existing.scalar_one_or_none():
+                print(f"  [=] Staking product already exists: {prod_data['name']}")
+                continue
+            product = StakingProduct(
+                asset=prod_data["asset"],
+                name=prod_data["name"],
+                description=prod_data.get("description"),
+                min_stake=Decimal(prod_data["min_stake"]) if prod_data.get("min_stake") else None,
+                is_active=True,
+            )
+            db.add(product)
+            await db.flush()
+            for i, period in enumerate(prod_data["periods"]):
+                db.add(StakingPeriod(
+                    product_id=product.id,
+                    label=period["label"],
+                    duration_days=period["duration_days"],
+                    reward_percent=Decimal(period["reward_percent"]),
+                    is_active=True,
+                    sort_order=i,
+                ))
+            print(f"  [+] Staking product: {prod_data['name']}")
 
         # --- System Flags ---
         for key, value in SYSTEM_FLAGS.items():

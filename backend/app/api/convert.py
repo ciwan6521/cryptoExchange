@@ -4,9 +4,11 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.supported_asset import SupportedAsset
 from app.models.user import User
 from app.api.deps import get_current_user
 from app.api.deps_flags import require_trading_enabled
@@ -26,11 +28,17 @@ class ConvertExecuteRequest(ConvertQuoteRequest):
 
 
 @router.get("/assets")
-async def list_convert_assets():
-    """Common assets available for convert."""
-    return {
-        "assets": ["USDT", "BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "DOGE", "T4PRO"],
-    }
+async def list_convert_assets(db: AsyncSession = Depends(get_db)):
+    """Assets available for convert — synced with supported_assets table."""
+    result = await db.execute(
+        select(SupportedAsset.symbol)
+        .where(SupportedAsset.is_active == True)
+        .order_by(SupportedAsset.symbol)
+    )
+    assets = [row[0] for row in result.all()]
+    if not assets:
+        assets = ["USDT", "BTC", "ETH"]
+    return {"assets": assets}
 
 
 @router.post("/quote")

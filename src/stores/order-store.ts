@@ -33,6 +33,15 @@ interface OrderState {
   fetchOpenOrders: (symbol?: string) => Promise<void>;
   fetchOrderHistory: (params?: { symbol?: string; limit?: number; offset?: number }) => Promise<void>;
   fetchUserTrades: (params?: { symbol?: string; limit?: number; offset?: number }) => Promise<void>;
+  updateOpenOrdersFromWs: (orders: Array<{
+    id: string;
+    symbol: string;
+    side: string;
+    status: string;
+    price: string | null;
+    quantity: string;
+    remaining: string;
+  }>) => void;
   clear: () => void;
 }
 
@@ -110,6 +119,32 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     } catch {
       set({ userTradesLoading: false });
     }
+  },
+
+  updateOpenOrdersFromWs: (orders) => {
+    const mapped: OrderItem[] = orders.map((o) => {
+      const qty = parseFloat(o.quantity);
+      const rem = parseFloat(o.remaining);
+      return {
+        id: o.id,
+        symbol: o.symbol,
+        side: o.side as 'buy' | 'sell',
+        order_type: 'limit',
+        status: o.status,
+        price: o.price,
+        stop_price: null,
+        quantity: o.quantity,
+        filled_quantity: String(Math.max(0, qty - rem)),
+        remaining: o.remaining,
+        fee_asset: null,
+        fee_total: '0',
+        created_at: '',
+        updated_at: '',
+        filled_at: null,
+        cancelled_at: null,
+      };
+    });
+    set({ openOrders: mapped, openOrdersLoading: false });
   },
 
   clear: () =>

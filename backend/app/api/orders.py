@@ -23,8 +23,8 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
-from app.api.deps import get_current_user
-from app.api.deps_flags import require_trading_enabled
+from app.api.deps import get_current_user, require_api_permission
+from app.api.deps_flags import require_trading_enabled, require_new_orders
 from app.middleware.rate_limit import rate_limit_orders
 from app.services.matching_engine import MatchingEngine, OrderError
 from app.models.trading import Order, TradingPair
@@ -77,7 +77,7 @@ def _serialize_trade(t) -> dict:
     }
 
 
-@router.post("/place", dependencies=[Depends(require_trading_enabled), Depends(rate_limit_orders)])
+@router.post("/place", dependencies=[Depends(require_trading_enabled), Depends(require_new_orders), Depends(rate_limit_orders), Depends(require_api_permission("trade"))])
 async def place_order(
     body: PlaceOrderRequest,
     request: Request,
@@ -184,7 +184,7 @@ async def place_order(
     }
 
 
-@router.post("/{order_id}/cancel", dependencies=[Depends(require_trading_enabled), Depends(rate_limit_orders)])
+@router.post("/{order_id}/cancel", dependencies=[Depends(require_trading_enabled), Depends(rate_limit_orders), Depends(require_api_permission("trade"))])
 async def cancel_order(
     order_id: uuid.UUID,
     user: User = Depends(get_current_user),

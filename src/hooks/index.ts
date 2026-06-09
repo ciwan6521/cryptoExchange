@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { getWebSocket } from '@/lib/websocket';
+import { getWebSocket, connectUserChannel, disconnectUserChannel } from '@/lib/websocket';
 import type { TradingPair, Orderbook, Trade, PerformanceMetrics } from '@/types';
 import { useTradingStore, selectTicker, selectOrderbook, selectTrades, selectAllTickers } from '@/stores/trading-store';
 
@@ -11,6 +11,7 @@ import { useTradingStore, selectTicker, selectOrderbook, selectTrades, selectAll
 
 export { useUserFlags } from './useUserFlags';
 export type { UserFlags } from './useUserFlags';
+export { connectUserChannel, disconnectUserChannel };
 
 /**
  * WebSocket connection and subscription hook

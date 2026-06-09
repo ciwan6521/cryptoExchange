@@ -566,3 +566,198 @@ export const adminWithdrawalsApi = {
       daily_limit_per_user: string;
     }>('/api/admin/withdrawals/stats/summary'),
 };
+
+// ============================================
+// Admin Deposits
+// ============================================
+
+export interface AdminDepositItem {
+  id: string;
+  user_id: string;
+  asset: string;
+  network: string;
+  amount: string;
+  tx_hash: string | null;
+  from_address: string | null;
+  confirmations: number;
+  required_confirmations: number;
+  status: string;
+  pay4pro_deposit_id: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export const adminDepositsApi = {
+  list: (params?: { user_id?: string; status?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.user_id) sp.set('user_id', params.user_id);
+    if (params?.status) sp.set('status', params.status);
+    if (params?.limit) sp.set('limit', String(params.limit));
+    if (params?.offset) sp.set('offset', String(params.offset));
+    const qs = sp.toString();
+    return adminRequest<{ deposits: AdminDepositItem[]; total: number }>(
+      `/api/admin/wallets/deposits${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  stats: () =>
+    adminRequest<{
+      pending_count: number;
+      today_completed_total: string;
+      total_completed_count: number;
+    }>('/api/admin/wallets/deposits/stats'),
+};
+
+// ============================================
+// Admin Launchpad
+// ============================================
+
+export interface AdminLaunchpadSale {
+  id: string;
+  token_symbol: string;
+  name: string;
+  description: string | null;
+  price_usdt: string;
+  total_allocation: string;
+  sold_amount: string;
+  remaining: string;
+  min_purchase_usdt: string;
+  max_purchase_usdt: string;
+  is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string | null;
+}
+
+export const adminLaunchpadApi = {
+  listSales: () =>
+    adminRequest<{ sales: AdminLaunchpadSale[] }>('/api/admin/launchpad/sales'),
+
+  createSale: (data: {
+    token_symbol: string;
+    name: string;
+    description?: string;
+    price_usdt: string;
+    total_allocation: string;
+    min_purchase_usdt?: string;
+    max_purchase_usdt?: string;
+    is_active?: boolean;
+    starts_at?: string;
+    ends_at?: string;
+  }) =>
+    adminRequest<{ ok: boolean; sale: AdminLaunchpadSale }>('/api/admin/launchpad/sales', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateSale: (id: string, data: Partial<{
+    name: string;
+    description: string;
+    price_usdt: string;
+    total_allocation: string;
+    min_purchase_usdt: string;
+    max_purchase_usdt: string;
+    is_active: boolean;
+    starts_at: string;
+    ends_at: string;
+  }>) =>
+    adminRequest<{ ok: boolean; sale: AdminLaunchpadSale }>(`/api/admin/launchpad/sales/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+};
+
+// ============================================
+// Admin P2P
+// ============================================
+
+export interface AdminP2PAd {
+  id: string;
+  user_id: string;
+  side: string;
+  asset: string;
+  fiat_currency: string;
+  price: string;
+  min_amount: string;
+  max_amount: string;
+  payment_method: string;
+  status: string;
+  created_at: string;
+}
+
+export interface AdminP2POrder {
+  id: string;
+  ad_id: string;
+  buyer_id: string;
+  seller_id: string;
+  asset: string;
+  amount: string;
+  price: string;
+  total_fiat: string;
+  status: string;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export const adminP2pApi = {
+  listAds: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set('status', params.status);
+    if (params?.limit) sp.set('limit', String(params.limit));
+    if (params?.offset) sp.set('offset', String(params.offset));
+    const qs = sp.toString();
+    return adminRequest<{ ads: AdminP2PAd[]; total: number }>(
+      `/api/admin/p2p/ads${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  deactivateAd: (adId: string) =>
+    adminRequest<{ ok: boolean }>(`/api/admin/p2p/ads/${adId}/deactivate`, { method: 'POST' }),
+
+  listOrders: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set('status', params.status);
+    if (params?.limit) sp.set('limit', String(params.limit));
+    if (params?.offset) sp.set('offset', String(params.offset));
+    const qs = sp.toString();
+    return adminRequest<{ orders: AdminP2POrder[]; total: number }>(
+      `/api/admin/p2p/orders${qs ? `?${qs}` : ''}`,
+    );
+  },
+};
+
+// ============================================
+// Admin Referral
+// ============================================
+
+export const adminReferralApi = {
+  getStats: () =>
+    adminRequest<{
+      total_referred_users: number;
+      top_referrers: Array<{ username: string; referral_code: string; referrals: number }>;
+    }>('/api/admin/referral/stats'),
+};
+
+// ============================================
+// Admin Options
+// ============================================
+
+export interface AdminOptionPosition {
+  id: string;
+  user_id: string;
+  asset: string;
+  option_type: string;
+  strike_price: string;
+  premium_usdt: string;
+  quantity: string;
+  expiry_at: string;
+  status: string;
+  opened_at: string | null;
+}
+
+export const adminOptionsApi = {
+  listOpenPositions: () =>
+    adminRequest<{ positions: AdminOptionPosition[]; total: number }>(
+      '/api/admin/options/positions',
+    ),
+};

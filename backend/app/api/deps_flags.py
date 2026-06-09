@@ -53,3 +53,13 @@ async def require_deposits_enabled(db: AsyncSession = Depends(get_db)) -> None:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Deposits are temporarily disabled by system administrator",
         )
+
+
+async def require_new_orders(db: AsyncSession = Depends(get_db)) -> None:
+    """Dependency: blocks request if new order placement is disabled."""
+    enabled = await _get_flag_value(db, "new_orders_enabled", default=True)
+    if not enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="New orders are temporarily disabled by system administrator",
+        )

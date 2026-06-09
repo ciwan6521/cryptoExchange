@@ -268,6 +268,23 @@ export default function T4ProIcoPage() {
                       ))}
                     </div>
                   </div>
+
+                  {process.env.NEXT_PUBLIC_T4PRO_CONTRACT_ADDRESS && (
+                    <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                      <p className="text-xs text-gray-500 mb-1">On-chain contract (BSC)</p>
+                      <p className="text-xs font-mono text-brand-400 break-all">
+                        {process.env.NEXT_PUBLIC_T4PRO_CONTRACT_ADDRESS}
+                      </p>
+                      <a
+                        href={`https://bscscan.com/address/${process.env.NEXT_PUBLIC_T4PRO_CONTRACT_ADDRESS}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-brand-400 mt-2"
+                      >
+                        View on BscScan <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             </div>

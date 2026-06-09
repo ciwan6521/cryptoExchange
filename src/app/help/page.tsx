@@ -4,17 +4,19 @@ import React from 'react';
 import Link from 'next/link';
 import { Header, Sidebar, Footer } from '@/components/layout';
 import { HelpCircle, Mail, FileText, Shield } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 export default function HelpPage() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const { t } = useI18n();
 
   const links = [
-    { title: 'Trading Guide', desc: 'Spot trading, order types, and fees', href: '/fees', icon: FileText },
-    { title: 'Futures / Leverage', desc: 'USDT-margined positions up to 100x', href: '/futures', icon: HelpCircle },
-    { title: 'T4PRO Token ICO', desc: 'Official token sale — join Telegram & social channels', href: '/ico/t4pro', icon: HelpCircle },
-    { title: 'Staking (Earn)', desc: 'Lock coins for configured reward periods', href: '/earn', icon: Shield },
-    { title: 'KYC Verification', desc: 'Required for trading, staking, and withdrawals', href: '/kyc', icon: Shield },
-    { title: 'Contact Support', desc: 'support@crypto4pro.io', href: 'mailto:support@crypto4pro.io', icon: Mail },
+    { title: t('help.tradingGuide'), desc: t('help.tradingGuideDesc'), href: '/fees', icon: FileText },
+    { title: t('help.futures'), desc: t('help.futuresDesc'), href: '/futures', icon: HelpCircle },
+    { title: t('help.ico'), desc: t('help.icoDesc'), href: '/ico/t4pro', icon: HelpCircle },
+    { title: t('help.staking'), desc: t('help.stakingDesc'), href: '/earn', icon: Shield },
+    { title: t('help.kyc'), desc: t('help.kycDesc'), href: '/kyc', icon: Shield },
+    { title: t('help.support'), desc: t('help.supportDesc'), href: 'mailto:support@crypto4pro.io', icon: Mail },
   ];
 
   return (
@@ -22,12 +24,12 @@ export default function HelpPage() {
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="flex-1 pt-24 pb-12 px-4 max-w-3xl mx-auto w-full">
-        <h1 className="text-2xl font-display font-bold text-white mb-2">Help Center</h1>
-        <p className="text-gray-400 mb-8">Quick links for common topics.</p>
+        <h1 className="text-2xl font-display font-bold text-white mb-2">{t('help.title')}</h1>
+        <p className="text-gray-400 mb-8">{t('help.subtitle')}</p>
         <div className="space-y-3">
           {links.map(item => (
             <Link
-              key={item.title}
+              key={item.href}
               href={item.href}
               className="flex items-start gap-4 p-4 rounded-xl border border-glass-border bg-surface-200 hover:border-glass-hover transition-colors"
             >
@@ -40,10 +42,10 @@ export default function HelpPage() {
           ))}
         </div>
         <div className="mt-8 text-sm text-gray-500">
-          See also{' '}
-          <Link href="/legal/terms" className="text-brand-400 hover:underline">Terms of Service</Link>
+          {t('help.seeAlso')}{' '}
+          <Link href="/legal/terms" className="text-brand-400 hover:underline">{t('help.terms')}</Link>
           {' '}and{' '}
-          <Link href="/legal/privacy" className="text-brand-400 hover:underline">Privacy Policy</Link>.
+          <Link href="/legal/privacy" className="text-brand-400 hover:underline">{t('help.privacy')}</Link>.
         </div>
       </main>
       <Footer variant="minimal" />

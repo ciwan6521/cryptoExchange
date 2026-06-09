@@ -11,12 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
-from app.models.platform import P2PAd, P2POrder
+from app.models.platform import P2PAd, P2POrder, P2PMessage
 from app.api.deps import get_current_user
 from app.services.ledger_service import LedgerService, InsufficientBalanceError
 
 router = APIRouter(prefix="/api/p2p", tags=["p2p"])
 logger = logging.getLogger("crypto4pro.p2p")
+
+FIAT_CURRENCIES = ["TRY", "USD", "EUR", "GBP"]
+PAYMENT_METHODS = ["Bank Transfer", "Papara", "Wise", "Revolut", "Cash"]
 
 
 class CreateAdRequest(BaseModel):
@@ -31,6 +34,23 @@ class CreateAdRequest(BaseModel):
 
 class StartOrderRequest(BaseModel):
     amount: str
+
+
+class P2PMessageRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class DisputeRequest(BaseModel):
+    reason: str = Field(min_length=5, max_length=500)
+
+
+@router.get("/config")
+async def p2p_config():
+    """Public P2P marketplace configuration."""
+    return {
+        "fiat_currencies": FIAT_CURRENCIES,
+        "payment_methods": PAYMENT_METHODS,
+    }
 
 
 @router.get("/ads")
@@ -84,6 +104,21 @@ async def create_ad(
             raise ValueError
     except (InvalidOperation, ValueError):
         raise HTTPException(status_code=400, detail="Invalid ad parameters")
+
+    ledger = LedgerService(db)
+    if body.side == "sell":
+        try:
+            await ledger.lock_funds(
+                user_id=user.id,
+                asset=body.asset.upper(),
+                amount=max_amt,
+                idempotency_key=f"p2p_ad_lock:{user.id}:{body.asset}:{max_amt}",
+                reference_type="p2p_ad",
+                reference_id=uuid.uuid4(),
+                description=f"P2P sell ad reserve {max_amt} {body.asset}",
+            )
+        except InsufficientBalanceError:
+            raise HTTPException(status_code=400, detail="Insufficient balance for sell ad")
 
     ad = P2PAd(
         user_id=user.id,
@@ -208,8 +243,8 @@ async def confirm_order(
         raise HTTPException(status_code=404, detail="Order not found")
     if order.seller_id != user.id:
         raise HTTPException(status_code=403, detail="Only seller can confirm payment")
-    if order.status != "pending":
-        raise HTTPException(status_code=400, detail="Order already processed")
+    if order.status != "paid":
+        raise HTTPException(status_code=400, detail="Buyer must mark payment as sent first")
 
     ledger = LedgerService(db)
     try:
@@ -253,7 +288,7 @@ async def cancel_order(
         raise HTTPException(status_code=404, detail="Order not found")
     if user.id not in (order.buyer_id, order.seller_id):
         raise HTTPException(status_code=403, detail="Not your order")
-    if order.status != "pending":
+    if order.status not in ("pending", "paid"):
         raise HTTPException(status_code=400, detail="Cannot cancel")
 
     ledger = LedgerService(db)
@@ -273,3 +308,109 @@ async def cancel_order(
     order.status = "cancelled"
     await db.commit()
     return {"ok": True}
+
+
+@router.post("/orders/{order_id}/mark-paid")
+async def mark_paid(
+    order_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Buyer marks fiat payment as sent."""
+    result = await db.execute(select(P2POrder).where(P2POrder.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.buyer_id != user.id:
+        raise HTTPException(status_code=403, detail="Only buyer can mark payment sent")
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail="Invalid order status")
+    order.status = "paid"
+    await db.commit()
+    return {"ok": True, "status": "paid"}
+
+
+@router.post("/orders/{order_id}/dispute")
+async def open_dispute(
+    order_id: uuid.UUID,
+    body: DisputeRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(P2POrder).where(P2POrder.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if user.id not in (order.buyer_id, order.seller_id):
+        raise HTTPException(status_code=403, detail="Not your order")
+    if order.status not in ("pending", "paid"):
+        raise HTTPException(status_code=400, detail="Cannot dispute this order")
+    order.status = "disputed"
+    order.dispute_reason = body.reason
+    await db.commit()
+    logger.warning("P2P dispute opened: order=%s by=%s", order_id, user.id)
+    return {"ok": True, "status": "disputed"}
+
+
+@router.get("/orders/{order_id}/messages")
+async def list_messages(
+    order_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(P2POrder).where(P2POrder.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if user.id not in (order.buyer_id, order.seller_id):
+        raise HTTPException(status_code=403, detail="Not your order")
+
+    msgs = await db.execute(
+        select(P2PMessage)
+        .where(P2PMessage.order_id == order_id)
+        .order_by(P2PMessage.created_at)
+    )
+    return {
+        "messages": [
+            {
+                "id": str(m.id),
+                "user_id": str(m.user_id),
+                "body": m.body,
+                "created_at": m.created_at.isoformat(),
+                "is_mine": m.user_id == user.id,
+            }
+            for m in msgs.scalars().all()
+        ],
+    }
+
+
+@router.post("/orders/{order_id}/messages")
+async def post_message(
+    order_id: uuid.UUID,
+    body: P2PMessageRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(P2POrder).where(P2POrder.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if user.id not in (order.buyer_id, order.seller_id):
+        raise HTTPException(status_code=403, detail="Not your order")
+    if order.status in ("cancelled", "completed"):
+        raise HTTPException(status_code=400, detail="Order is closed")
+
+    msg = P2PMessage(order_id=order_id, user_id=user.id, body=body.body.strip())
+    db.add(msg)
+    await db.commit()
+    await db.refresh(msg)
+    return {
+        "ok": True,
+        "message": {
+            "id": str(msg.id),
+            "user_id": str(msg.user_id),
+            "body": msg.body,
+            "created_at": msg.created_at.isoformat(),
+            "is_mine": True,
+        },
+    }

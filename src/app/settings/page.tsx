@@ -31,6 +31,7 @@ import { authApi, ApiError, type SessionItem, apiKeysApi, alertsApi, notificatio
 import { useAuthStore } from '@/stores/auth-store';
 import { isEnabled } from '@/lib/feature-flags';
 import { LanguageSwitcher, useI18n } from '@/lib/i18n';
+import { useTheme, type Theme } from '@/lib/theme';
 
 type SettingsTab = 'profile' | 'security' | 'notifications' | 'alerts' | 'appearance';
 
@@ -811,7 +812,7 @@ function NotificationRow({ title, description, checked, onChange }: { title: str
 }
 
 function AppearanceSettings() {
-  const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
+  const { theme, setTheme } = useTheme();
   return (
     <Card>
       <CardHeader title="Appearance" subtitle="Customize how Crypto4Pro looks" />
@@ -823,14 +824,14 @@ function AppearanceSettings() {
         <div>
           <h4 className="text-sm font-medium text-gray-300 mb-3">Theme</h4>
           <div className="grid grid-cols-3 gap-3">
-            {[
+            {([
               { value: 'dark', label: 'Dark' },
               { value: 'light', label: 'Light' },
               { value: 'system', label: 'System' },
-            ].map((option) => (
+            ] as const).map((option) => (
               <button
                 key={option.value}
-                onClick={() => setTheme(option.value as any)}
+                onClick={() => setTheme(option.value as Theme)}
                 className={cn(
                   'p-4 rounded-xl border text-center transition-all',
                   theme === option.value
@@ -841,15 +842,6 @@ function AppearanceSettings() {
                 {option.label}
               </button>
             ))}
-          </div>
-        </div>
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-amber-400">Light mode coming soon</p>
-              <p className="text-xs text-gray-400 mt-1">We&apos;re currently optimizing the light theme for the best experience.</p>
-            </div>
           </div>
         </div>
       </div>

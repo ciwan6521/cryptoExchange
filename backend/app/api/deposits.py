@@ -23,6 +23,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.wallet import Wallet, Deposit
 from app.api.deps import get_current_user
+from app.api.deps_flags import require_deposits_enabled
 
 logger = logging.getLogger("crypto4pro.deposits")
 
@@ -174,7 +175,7 @@ async def get_my_deposits(
     }
 
 
-@router.post("/claim")
+@router.post("/claim", dependencies=[Depends(require_deposits_enabled)])
 async def claim_deposit(
     body: DepositClaimRequest,
     user: User = Depends(get_current_user),
@@ -275,4 +276,59 @@ async def claim_deposit(
         },
         "cooldown_until": cooldown_until.isoformat(),
         "message": "Deposit claim submitted. It will be credited after admin verification.",
+    }
+
+
+class CardDepositRequest(BaseModel):
+    amount: str = Field(..., min_length=1)
+    currency: str = Field(default="USD", max_length=10)
+    card_last4: str = Field(..., min_length=4, max_length=4)
+    card_brand: str = Field(default="visa", max_length=20)
+
+
+@router.post("/card", dependencies=[Depends(require_deposits_enabled)])
+async def request_card_deposit(
+    body: CardDepositRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit a credit/debit card deposit request for manual or PSP processing."""
+    if user.kyc_status != "approved":
+        raise HTTPException(status_code=403, detail="KYC required for card deposits")
+
+    try:
+        amount = Decimal(body.amount)
+        if amount <= 0:
+            raise ValueError
+    except (InvalidOperation, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid amount")
+
+    deposit_id = uuid.uuid4()
+    deposit = Deposit(
+        id=deposit_id,
+        user_id=user.id,
+        asset=body.currency.upper(),
+        network="card",
+        amount=amount,
+        status="pending",
+        idempotency_key=f"card_deposit:{user.id}:{deposit_id}",
+    )
+    db.add(deposit)
+    await db.commit()
+    await db.refresh(deposit)
+
+    logger.info(
+        "Card deposit request: user=%s amount=%s %s brand=%s last4=%s",
+        user.id, amount, body.currency, body.card_brand, body.card_last4,
+    )
+
+    return {
+        "ok": True,
+        "deposit": {
+            "id": str(deposit.id),
+            "amount": str(deposit.amount),
+            "currency": body.currency.upper(),
+            "status": deposit.status,
+        },
+        "message": "Card deposit submitted. Funds will be credited after payment verification (typically 5–30 minutes).",
     }

@@ -254,7 +254,12 @@ class LeverageService:
         position.closed_at = datetime.now(timezone.utc)
         return pnl
 
-    async def close_position(self, user_id: uuid.UUID, position_id: uuid.UUID) -> LeveragePosition:
+    async def close_position(
+        self,
+        user_id: uuid.UUID,
+        position_id: uuid.UUID,
+        percent: int = 100,
+    ) -> LeveragePosition:
         result = await self.db.execute(
             select(LeveragePosition).where(
                 LeveragePosition.id == position_id,
@@ -270,10 +275,106 @@ class LeverageService:
         mark = await get_mark_price(position.base_asset)
         if is_liquidated(position.side, mark, position.liquidation_price):
             await self._settle_position(position, mark, "liquidated")
-        else:
-            await self._settle_position(position, mark, "closed")
+            logger.info("Leverage liquidated on close: user=%s position=%s", user_id, position_id)
+            return position
 
-        logger.info("Leverage closed: user=%s position=%s status=%s", user_id, position_id, position.status)
+        if percent >= 100:
+            await self._settle_position(position, mark, "closed")
+            logger.info("Leverage closed: user=%s position=%s", user_id, position_id)
+            return position
+
+        fraction = Decimal(percent) / Decimal("100")
+        close_margin = _quantize(position.margin_usdt * fraction)
+        close_notional = _quantize(position.notional_usdt * fraction)
+        close_qty = _quantize(position.quantity * fraction)
+
+        pnl = calc_unrealized_pnl(position.side, position.entry_price, mark, close_notional)
+        if pnl < -close_margin:
+            pnl = -close_margin
+
+        await self.ledger.unlock_funds(
+            user_id=position.user_id,
+            asset=MARGIN_ASSET,
+            amount=close_margin,
+            idempotency_key=f"lev_partial_unlock:{position.id}:{percent}",
+            reference_type="leverage",
+            reference_id=position.id,
+            description=f"Partial close {percent}% margin release",
+        )
+        if pnl > 0:
+            await self.ledger.credit(
+                user_id=position.user_id,
+                asset=MARGIN_ASSET,
+                amount=pnl,
+                category="leverage_pnl",
+                idempotency_key=f"lev_partial_pnl_credit:{position.id}:{percent}",
+                reference_type="leverage",
+                reference_id=position.id,
+                description=f"Partial close profit {percent}%",
+            )
+        elif pnl < 0:
+            await self.ledger.debit(
+                user_id=position.user_id,
+                asset=MARGIN_ASSET,
+                amount=min(abs(pnl), close_margin),
+                category="leverage_pnl",
+                idempotency_key=f"lev_partial_pnl_debit:{position.id}:{percent}",
+                reference_type="leverage",
+                reference_id=position.id,
+                description=f"Partial close loss {percent}%",
+            )
+
+        position.margin_usdt -= close_margin
+        position.notional_usdt -= close_notional
+        position.quantity -= close_qty
+        position.liquidation_price = calc_liquidation_price(
+            position.entry_price, position.side, position.leverage
+        )
+        position.realized_pnl = (position.realized_pnl or Decimal("0")) + pnl
+
+        logger.info("Leverage partial close %s%%: user=%s position=%s", percent, user_id, position_id)
+        return position
+
+    async def add_margin(
+        self,
+        user_id: uuid.UUID,
+        position_id: uuid.UUID,
+        extra_margin_usdt: Decimal,
+    ) -> LeveragePosition:
+        if extra_margin_usdt <= 0:
+            raise LeverageError("Margin amount must be positive")
+
+        result = await self.db.execute(
+            select(LeveragePosition).where(
+                LeveragePosition.id == position_id,
+                LeveragePosition.user_id == user_id,
+                LeveragePosition.status == "open",
+            )
+        )
+        position = result.scalar_one_or_none()
+        if not position:
+            raise LeverageError("Open position not found")
+
+        mark = await get_mark_price(position.base_asset)
+        added_notional = extra_margin_usdt * Decimal(position.leverage)
+
+        await self.ledger.lock_funds(
+            user_id=user_id,
+            asset=MARGIN_ASSET,
+            amount=extra_margin_usdt,
+            idempotency_key=f"lev_add_margin:{position.id}:{extra_margin_usdt}",
+            reference_type="leverage",
+            reference_id=position.id,
+            description="Add margin to leverage position",
+        )
+
+        position.margin_usdt += extra_margin_usdt
+        position.notional_usdt += added_notional
+        position.quantity += added_notional / mark if mark > 0 else Decimal("0")
+        position.liquidation_price = calc_liquidation_price(
+            position.entry_price, position.side, position.leverage
+        )
+        logger.info("Added margin %s to position %s", extra_margin_usdt, position_id)
         return position
 
     async def maybe_liquidate(self, position: LeveragePosition) -> bool:
@@ -288,3 +389,15 @@ class LeverageService:
         await self._settle_position(position, mark, "liquidated")
         logger.warning("Leverage liquidated: user=%s position=%s", position.user_id, position.id)
         return True
+
+    async def sweep_liquidations(self) -> int:
+        """Scan all open positions and liquidate those at or past liquidation price."""
+        result = await self.db.execute(
+            select(LeveragePosition).where(LeveragePosition.status == "open")
+        )
+        positions = list(result.scalars().all())
+        liquidated = 0
+        for position in positions:
+            if await self.maybe_liquidate(position):
+                liquidated += 1
+        return liquidated

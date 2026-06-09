@@ -17,7 +17,7 @@ from app.models.trading import TradingPair
 from app.api.deps import get_current_user
 from app.api.deps_flags import require_trading_enabled
 from app.middleware.rate_limit import rate_limit_orders
-from app.schemas.leverage import OpenLeverageRequest
+from app.schemas.leverage import OpenLeverageRequest, PartialCloseRequest, AddMarginRequest
 from app.services.leverage_service import (
     LeverageService,
     LeverageError,
@@ -29,6 +29,19 @@ from app.services.leverage_service import (
 
 router = APIRouter(prefix="/api/leverage", tags=["leverage"])
 logger = logging.getLogger("crypto4pro.leverage")
+
+PAIR_LEVERAGE_CAPS: dict[str, int] = {
+    "BTC": 125,
+    "ETH": 100,
+    "SOL": 50,
+    "XRP": 50,
+    "DOGE": 25,
+    "AVAX": 50,
+    "BNB": 50,
+    "ADA": 25,
+    "TRX": 25,
+}
+DEFAULT_PAIR_LEVERAGE_CAP = 20
 
 
 async def require_futures_enabled() -> None:
@@ -64,11 +77,17 @@ async def get_leverage_config(db: AsyncSession = Depends(get_db)):
         "max_leverage": settings.LEVERAGE_MAX,
         "min_margin_usdt": settings.LEVERAGE_MIN_MARGIN_USDT,
         "maintenance_margin_rate": settings.LEVERAGE_MAINTENANCE_MARGIN_RATE,
+        "funding_rate": "0.0001",
+        "funding_interval_hours": 8,
+        "disclaimer": "Synthetic USDT-margined positions — not connected to external perpetual venues.",
         "pairs": [
             {
                 "symbol": p.symbol,
                 "base_asset": p.base_asset,
                 "quote_asset": p.quote_asset,
+                "max_leverage": PAIR_LEVERAGE_CAPS.get(
+                    p.base_asset, DEFAULT_PAIR_LEVERAGE_CAP
+                ),
             }
             for p in pairs
         ],
@@ -161,12 +180,14 @@ async def open_position(
 @router.post("/positions/{position_id}/close", dependencies=[Depends(require_futures_enabled), Depends(require_trading_enabled), Depends(rate_limit_orders)])
 async def close_position(
     position_id: uuid.UUID,
+    body: PartialCloseRequest | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    percent = body.percent if body else 100
     service = LeverageService(db)
     try:
-        position = await service.close_position(user.id, position_id)
+        position = await service.close_position(user.id, position_id, percent=percent)
         await db.commit()
         await db.refresh(position)
         mark = position.close_price
@@ -179,6 +200,34 @@ async def close_position(
         "ok": True,
         "position": position_to_dict(position, mark),
     }
+
+
+@router.post("/positions/{position_id}/add-margin", dependencies=[Depends(require_futures_enabled), Depends(require_trading_enabled)])
+async def add_margin(
+    position_id: uuid.UUID,
+    body: AddMarginRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _check_user_eligibility(user)
+    try:
+        amount = Decimal(body.margin_usdt)
+        if amount <= 0:
+            raise ValueError
+    except (InvalidOperation, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid margin amount")
+
+    service = LeverageService(db)
+    try:
+        position = await service.add_margin(user.id, position_id, amount)
+        await db.commit()
+        await db.refresh(position)
+        mark = await get_mark_price(position.base_asset)
+    except LeverageError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=e.message)
+
+    return {"ok": True, "position": position_to_dict(position, mark)}
 
 
 @router.get("/preview")

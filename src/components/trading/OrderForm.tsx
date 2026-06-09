@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Info, AlertCircle, Lock } from 'lucide-react';
@@ -32,6 +32,8 @@ interface OrderFormProps {
   currentPrice: number;
   availableBase?: number;
   availableQuote?: number;
+  bookPrice?: number | null;
+  pairEnabled?: boolean;
   onSubmit?: (order: OrderData) => void;
 }
 
@@ -55,13 +57,15 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   currentPrice,
   availableBase = 0,
   availableQuote = 0,
+  bookPrice = null,
+  pairEnabled = true,
   onSubmit,
 }) => {
   const precision = useMemo(() => getPrecision(symbol), [symbol]);
   const tradingDisabled = useTradingDisabled();
   const liveTradingEnabled = isEnabled('ENABLE_LIVE_TRADING');
   const { tradingEnabled: adminTradingOn, newOrdersEnabled: adminNewOrdersOn } = useAdminStore((s) => s.systemFlags);
-  const pairDisabled = false; // Pair-level disable comes from backend via market API
+  const pairDisabled = !pairEnabled;
   const { userTradingEnabled } = useUserFlags();
   const depositCooldownUntil = useAuthStore((s) => s.user?.depositCooldownUntil);
   const isCooldownActive = Boolean(depositCooldownUntil && new Date(depositCooldownUntil).getTime() > Date.now());
@@ -86,6 +90,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const [quantity, setQuantity] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentPrice > 0) {
+      setPrice(toFixed(currentPrice, precision.price));
+    }
+  }, [currentPrice, precision.price]);
+
+  useEffect(() => {
+    if (bookPrice != null && bookPrice > 0) {
+      setPrice(toFixed(bookPrice, precision.price));
+      setOrderType((prev) => (prev === 'market' ? 'limit' : prev));
+    }
+  }, [bookPrice, precision.price]);
 
   // All arithmetic through decimal.ts — never native floats
   const effectivePrice = orderType === 'market' ? currentPrice.toString() : price;

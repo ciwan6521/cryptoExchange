@@ -2,10 +2,71 @@
   "nav": {
     "dashboard": "Dashboard",
     "trade": "Trade",
+    "futures": "Futures",
     "convert": "Convert",
     "p2p": "P2P",
+    "earn": "Earn",
+    "ico": "T4PRO ICO",
     "wallet": "Wallet",
-    "settings": "Settings"
+    "rewards": "Rewards",
+    "markets": "Markets",
+    "spot": "Spot",
+    "options": "Options",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "searchPlaceholder": "Search markets...",
+    "login": "Log In",
+    "signup": "Sign Up",
+    "signOut": "Sign Out",
+    "ledger": "Ledger History"
+  },
+  "sidebar": {
+    "main": "Main",
+    "account": "Account",
+    "signOut": "Sign Out"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Welcome back! Here's an overview of your portfolio.",
+    "totalValue": "Total Portfolio Value",
+    "yourAssets": "Your Assets",
+    "viewAll": "View All",
+    "openOrders": "Open Orders",
+    "markets": "Markets",
+    "quickStats": "Quick Stats",
+    "pnl24h": "24h PnL",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "trade": "Trade",
+    "earn": "Earn"
+  },
+  "wallet": {
+    "title": "Wallet",
+    "subtitle": "Manage your crypto portfolio",
+    "totalValue": "Total Portfolio Value",
+    "withdrawHistory": "Withdrawal History",
+    "asset": "Asset",
+    "balance": "Balance",
+    "locked": "Locked",
+    "price": "Price (USD)",
+    "value": "Value (USD)",
+    "pricesNote": "Prices updated in real-time."
+  },
+  "trade": {
+    "searchMarkets": "Search markets...",
+    "browseMarkets": "Browse all markets →",
+    "pairDisabled": "Trading for this pair is currently disabled"
+  },
+  "futures": {
+    "title": "Futures Trading",
+    "fundingRate": "Funding Rate",
+    "partialClose": "Close %",
+    "closePosition": "Close Position",
+    "disclaimer": "Synthetic USDT-margined positions — not connected to external perpetual venues."
+  },
+  "earn": {
+    "title": "Earn",
+    "subtitle": "Grow your crypto with staking and rewards"
   },
   "common": {
     "loading": "Loading...",
@@ -13,7 +74,8 @@
     "retry": "Retry",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "save": "Save"
+    "save": "Save",
+    "exportCsv": "Export CSV"
   },
   "convert": {
     "title": "Instant Convert",
@@ -28,9 +90,12 @@
   },
   "p2p": {
     "title": "P2P Marketplace",
+    "subtitle": "Buy and sell crypto directly with other users",
     "buy": "Buy",
     "sell": "Sell",
-    "myOrders": "My Orders"
+    "myOrders": "My Orders",
+    "marketplace": "Marketplace",
+    "createAd": "Create Ad"
   },
   "options": {
     "title": "Options Trading",
@@ -41,10 +106,50 @@
     "duration": "Duration",
     "open": "Open Position",
     "positions": "Open Positions",
-    "close": "Close"
+    "close": "Close",
+    "disclaimer": "Synthetic options — premiums and settlement are ledger-based, not exchange-traded contracts."
   },
   "language": {
     "en": "English",
     "tr": "Türkçe"
+  },
+  "help": {
+    "title": "Help Center",
+    "subtitle": "Quick links for common topics.",
+    "tradingGuide": "Trading Guide",
+    "tradingGuideDesc": "Spot trading, order types, and fees",
+    "futures": "Futures / Leverage",
+    "futuresDesc": "USDT-margined positions up to 100x",
+    "ico": "T4PRO Token ICO",
+    "icoDesc": "Official token sale — join Telegram & social channels",
+    "staking": "Staking (Earn)",
+    "stakingDesc": "Lock coins for configured reward periods",
+    "kyc": "KYC Verification",
+    "kycDesc": "Required for trading, staking, and withdrawals",
+    "support": "Contact Support",
+    "supportDesc": "support@crypto4pro.io",
+    "seeAlso": "See also",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy"
+  },
+  "fees": {
+    "title": "Fee Schedule",
+    "subtitle": "Crypto4Pro — Last updated: March 2026. Fees are subject to change with notice on this page.",
+    "spotTitle": "Spot trading",
+    "spotDesc": "Spot maker and taker fees apply to executed trades. Your effective rate depends on your 30-day trading volume and VIP tier.",
+    "type": "Type",
+    "rate": "Rate",
+    "maker": "Maker",
+    "taker": "Taker",
+    "spotNote": "Base spot rates before VIP discounts. Maker orders add liquidity; taker orders remove liquidity.",
+    "vipTitle": "VIP tiers",
+    "vipDesc": "30-day spot trading volume is calculated in USD equivalent across all pairs. Higher tiers unlock lower maker and taker fees.",
+    "tier": "Tier",
+    "volume": "30-day volume (USD)",
+    "withdrawTitle": "Withdrawal fees",
+    "withdrawDesc": "Network fees are charged per withdrawal and may be adjusted with network congestion. Always confirm the amount shown at withdrawal time.",
+    "asset": "Asset",
+    "network": "Network",
+    "fee": "Fee"
   }
 }

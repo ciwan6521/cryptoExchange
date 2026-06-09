@@ -157,6 +157,40 @@ export default function AnalyticsPage() {
           ))}
         </div>
 
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+          <p className="text-[10px] text-gray-600 mb-3">Platform overview (bar chart)</p>
+          {loading ? (
+            <div className="h-32 flex items-end gap-4 px-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex-1 h-20 bg-white/[0.06] rounded animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            (() => {
+              const chartData = [
+                { label: 'Users', value: snap.usersTotal, color: 'bg-brand-500' },
+                { label: 'Orders', value: snap.ordersTotal, color: 'bg-purple-500' },
+                { label: 'Pairs', value: snap.pairsCount, color: 'bg-emerald-500' },
+              ];
+              const maxVal = Math.max(...chartData.map(d => d.value), 1);
+              return (
+                <div className="flex items-end gap-6 h-36 px-2">
+                  {chartData.map(d => (
+                    <div key={d.label} className="flex-1 flex flex-col items-center gap-1.5">
+                      <span className="text-[10px] text-white font-mono tabular-nums">{d.value}</span>
+                      <div
+                        className={cn('w-full rounded-t transition-all', d.color)}
+                        style={{ height: `${Math.max(8, (d.value / maxVal) * 100)}%` }}
+                      />
+                      <span className="text-[10px] text-gray-500">{d.label}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
+          )}
+        </div>
+
         <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg overflow-hidden">
           <p className="text-[10px] text-gray-600 px-3 py-2 border-b border-white/[0.06]">Platform totals</p>
           <table className="w-full text-xs">

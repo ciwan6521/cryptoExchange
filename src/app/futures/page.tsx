@@ -20,6 +20,7 @@ import { useBalanceStore } from '@/stores/balance-store';
 import { useTickers } from '@/hooks';
 import { isEnabled } from '@/lib/feature-flags';
 import { toast } from 'sonner';
+import { TradingViewChart, toTradingViewSymbol } from '@/components/trading';
 
 const LEVERAGE_STEPS = [1, 2, 3, 5, 10, 20, 25, 50, 75, 100];
 
@@ -40,10 +41,15 @@ export default function FuturesPage() {
   const [preview, setPreview] = useState<LeveragePreviewResponse | null>(null);
   const [opening, setOpening] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
+  const [closePercents, setClosePercents] = useState<Record<string, number>>({});
+  const [addMarginAmount, setAddMarginAmount] = useState<Record<string, string>>({});
+  const [addingMarginId, setAddingMarginId] = useState<string | null>(null);
   const [showPairPicker, setShowPairPicker] = useState(false);
   const [, setTick] = useState(0);
 
   const baseAsset = selectedSymbol.split('-')[0] || 'BTC';
+  const selectedPair = config?.pairs.find(p => p.symbol === selectedSymbol);
+  const pairMaxLeverage = selectedPair?.max_leverage ?? config?.max_leverage ?? 100;
   const ticker = allTickers.find(t => t.baseAsset === baseAsset);
   const markPrice = ticker?.price || (preview ? parseFloat(preview.mark_price) : 0);
 
@@ -77,6 +83,12 @@ export default function FuturesPage() {
   }, [isAuthenticated, fetchBalances, selectedSymbol]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (leverage > pairMaxLeverage) {
+      setLeverage(pairMaxLeverage);
+    }
+  }, [pairMaxLeverage, leverage]);
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -153,15 +165,45 @@ export default function FuturesPage() {
   };
 
   const handleClose = async (id: string) => {
+    const percent = closePercents[id] ?? 100;
     setClosingId(id);
     try {
-      await leverageApi.close(id);
-      toast.success('Position closed');
+      await leverageApi.close(id, percent);
+      toast.success(percent >= 100 ? 'Position closed' : `Closed ${percent}% of position`);
+      setClosePercents((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       await loadData();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.detail : 'Failed to close position');
     } finally {
       setClosingId(null);
+    }
+  };
+
+  const handleAddMargin = async (id: string) => {
+    const amount = addMarginAmount[id]?.trim();
+    const amt = parseFloat(amount || '');
+    if (!amount || isNaN(amt) || amt <= 0) {
+      toast.error('Enter a valid margin amount');
+      return;
+    }
+    if (amt > usdtBalance) {
+      toast.error('Insufficient USDT balance');
+      return;
+    }
+    setAddingMarginId(id);
+    try {
+      await leverageApi.addMargin(id, amount);
+      toast.success('Margin added');
+      setAddMarginAmount(prev => ({ ...prev, [id]: '' }));
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : 'Failed to add margin');
+    } finally {
+      setAddingMarginId(null);
     }
   };
 
@@ -202,15 +244,45 @@ export default function FuturesPage() {
               USDT-Margined Futures
             </div>
             <h1 className="text-2xl md:text-3xl font-display font-bold text-white mb-2">
-              Trade with up to {config?.max_leverage || 100}x Leverage
+              Trade with up to {pairMaxLeverage}x Leverage
             </h1>
             <p className="text-gray-400 max-w-xl">
               Open long or short positions on top markets. Margin is locked in USDT;
               positions are marked to market and liquidated automatically at the liquidation price.
             </p>
+            {config?.funding_rate && (
+              <p className="text-xs text-gray-500 mt-3">
+                Funding rate: {(parseFloat(config.funding_rate) * 100).toFixed(4)}% / {config.funding_interval_hours ?? 8}h
+              </p>
+            )}
           </div>
           <Zap className="absolute -right-4 -bottom-4 w-32 h-32 text-brand-500/10" />
         </div>
+
+        {/* Price chart */}
+        <div className="rounded-xl border border-glass-border bg-surface-200 overflow-hidden">
+          <div className="px-4 py-2 border-b border-glass-border flex items-center justify-between">
+            <span className="text-sm font-medium text-white">{selectedSymbol.replace('-', '/')} Chart</span>
+            <span className="text-xs text-gray-500">TradingView</span>
+          </div>
+          <div className="h-[360px]">
+            {markPrice > 0 ? (
+              <TradingViewChart symbol={toTradingViewSymbol(selectedSymbol)} />
+            ) : (
+              <div className="h-full flex items-center justify-center text-sm text-gray-500">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                Loading market data…
+              </div>
+            )}
+          </div>
+        </div>
+
+        {config?.disclaimer && (
+          <div className="flex items-start gap-2 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            {config.disclaimer}
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Order panel */}
@@ -253,7 +325,8 @@ export default function FuturesPage() {
                         )}
                       >
                         <CoinIcon symbol={p.base_asset} size={18} />
-                        {p.symbol.replace('-', '/')}
+                        <span className="flex-1 text-left">{p.symbol.replace('-', '/')}</span>
+                        <span className="text-xs text-gray-500">{p.max_leverage ?? config?.max_leverage ?? 100}x max</span>
                       </button>
                     ))}
                   </motion.div>
@@ -295,13 +368,13 @@ export default function FuturesPage() {
               <input
                 type="range"
                 min={1}
-                max={config?.max_leverage || 100}
-                value={leverage}
+                max={pairMaxLeverage}
+                value={Math.min(leverage, pairMaxLeverage)}
                 onChange={e => setLeverage(parseInt(e.target.value, 10))}
                 className="w-full accent-brand-500"
               />
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {LEVERAGE_STEPS.filter(v => v <= (config?.max_leverage || 100)).map(v => (
+                {LEVERAGE_STEPS.filter(v => v <= pairMaxLeverage).map(v => (
                   <button
                     key={v}
                     type="button"
@@ -475,14 +548,49 @@ export default function FuturesPage() {
                           )}
                         </div>
                         {pos.status === 'open' && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            loading={closingId === pos.id}
-                            onClick={() => handleClose(pos.id)}
-                          >
-                            Close
-                          </Button>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="Add margin"
+                                value={addMarginAmount[pos.id] || ''}
+                                onChange={e => setAddMarginAmount(prev => ({ ...prev, [pos.id]: e.target.value }))}
+                                className="w-24 bg-surface-100 border border-glass-border rounded-lg px-2 py-1.5 text-xs text-white"
+                              />
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                loading={addingMarginId === pos.id}
+                                onClick={() => handleAddMargin(pos.id)}
+                              >
+                                Add
+                              </Button>
+                            </div>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <select
+                                value={closePercents[pos.id] ?? 100}
+                                onChange={(e) => setClosePercents((prev) => ({
+                                  ...prev,
+                                  [pos.id]: parseInt(e.target.value, 10),
+                                }))}
+                                className="bg-surface-100 border border-glass-border rounded-lg px-2 py-1.5 text-xs text-white"
+                              >
+                                {[25, 50, 75, 100].map((pct) => (
+                                  <option key={pct} value={pct}>{pct}%</option>
+                                ))}
+                              </select>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                loading={closingId === pos.id}
+                                onClick={() => handleClose(pos.id)}
+                              >
+                                Close
+                              </Button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>

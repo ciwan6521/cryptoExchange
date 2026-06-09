@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -31,6 +31,8 @@ import { useUserFlags } from '@/hooks/useUserFlags';
 import { CMSBanners } from '@/components/layout/CMSRenderer';
 import { DepositModal } from '@/components/modals/DepositModal';
 import { WithdrawModal } from '@/components/modals/WithdrawModal';
+import { walletApi } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 // ============================================
 // Dashboard Page
@@ -42,27 +44,57 @@ export default function DashboardPage() {
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [totalValue, setTotalValue] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(false);
   const tickers = useTickers();
   const { depositsEnabled, withdrawalsEnabled } = useAdminStore((s) => s.systemFlags);
   const { userWithdrawalsEnabled } = useUserFlags();
+  const { t } = useI18n();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
   const { balances, isLoading: balancesLoading, fetchBalances } = useBalanceStore();
   const { openOrders, openOrdersLoading, fetchOpenOrders } = useOrderStore();
 
-  // Fetch real balances and open orders from backend on mount
+  // Fetch real balances, wallet value, and open orders from backend on mount
   useEffect(() => {
     if (isAuthenticated) {
       fetchBalances();
       fetchOpenOrders();
+      setWalletLoading(true);
+      walletApi.getWallet()
+        .then((data) => {
+          const val = parseFloat(data.total_value_usd || '0');
+          setTotalValue(isNaN(val) ? 0 : val);
+        })
+        .catch(() => setTotalValue(0))
+        .finally(() => setWalletLoading(false));
+    } else {
+      setTotalValue(0);
     }
   }, [isAuthenticated, fetchBalances, fetchOpenOrders]);
 
-  // Calculate total portfolio value from real balances
-  // For now, available balance is shown as-is (USDT = 1:1 USD)
-  const totalValue = balances.reduce((sum, b) => {
-    return sum + parseFloat(b.available || '0');
-  }, 0);
-  const totalChange = 0; // Real PnL requires price history — not mocked
+  const totalChange = useMemo(() => {
+    if (!isAuthenticated || balances.length === 0 || tickers.length === 0) return 0;
+    let pnlUsd = 0;
+    let totalUsd = 0;
+    for (const balance of balances) {
+      const total = parseFloat(balance.available || '0') + parseFloat(balance.locked || '0');
+      if (total <= 0) continue;
+      const ticker = tickers.find(
+        (tk) => tk.baseAsset === balance.asset || (balance.asset === 'USDT' && tk.baseAsset === 'USDT'),
+      );
+      const price = balance.asset === 'USDT'
+        ? 1
+        : ticker?.price ?? 0;
+      if (price <= 0) continue;
+      const valueUsd = total * price;
+      totalUsd += valueUsd;
+      const change24h = balance.asset === 'USDT' ? 0 : (ticker?.change24h ?? 0);
+      pnlUsd += valueUsd * (change24h / 100);
+    }
+    if (totalUsd <= 0) return 0;
+    return (pnlUsd / totalUsd) * 100;
+  }, [isAuthenticated, balances, tickers]);
   
   return (
     <div className="min-h-screen bg-surface-500">
@@ -82,10 +114,10 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
             >
               <h1 className="text-2xl font-display font-bold text-white mb-1">
-                Dashboard
+                {t('dashboard.title')}
               </h1>
               <p className="text-gray-400">
-                Welcome back! Here&apos;s an overview of your portfolio.
+                {t('dashboard.subtitle')}
               </p>
             </motion.div>
           </div>
@@ -110,7 +142,7 @@ export default function DashboardPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Wallet className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-400">Total Portfolio Value</span>
+                    <span className="text-sm text-gray-400">{t('dashboard.totalValue')}</span>
                     <button
                       onClick={() => setBalanceHidden(!balanceHidden)}
                       className="text-gray-500 hover:text-gray-300 transition-colors"
@@ -126,6 +158,8 @@ export default function DashboardPage() {
                   <div className="flex items-baseline gap-4">
                     {balanceHidden ? (
                       <span className="text-4xl font-bold text-white">••••••</span>
+                    ) : walletLoading ? (
+                      <Skeleton width={180} height={40} />
                     ) : (
                       <AnimatedNumber
                         value={totalValue}
@@ -188,12 +222,14 @@ export default function DashboardPage() {
               >
                 <Card padding="none">
                   <CardHeader
-                    title="Your Assets"
+                    title={t('dashboard.yourAssets')}
                     subtitle={`${balances.length} asset${balances.length !== 1 ? 's' : ''}`}
                     action={
-                      <Button variant="ghost" size="sm">
-                        View All
-                      </Button>
+                      <Link href="/wallet">
+                        <Button variant="ghost" size="sm">
+                          {t('dashboard.viewAll')}
+                        </Button>
+                      </Link>
                     }
                     className="px-4 pt-4"
                   />
@@ -267,12 +303,12 @@ export default function DashboardPage() {
               >
                 <Card padding="none">
                   <CardHeader
-                    title="Open Orders"
+                    title={t('dashboard.openOrders')}
                     subtitle={`${openOrders.length} active`}
                     action={
                       <Link href="/trade/BTC-USDT">
                         <Button variant="ghost" size="sm">
-                          View All
+                          {t('dashboard.viewAll')}
                         </Button>
                       </Link>
                     }
@@ -341,9 +377,12 @@ export default function DashboardPage() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  <button className="text-gray-500 hover:text-white transition-colors">
+                                  <Link
+                                    href={`/trade/${order.symbol}`}
+                                    className="inline-flex text-gray-500 hover:text-white transition-colors"
+                                  >
                                     <MoreHorizontal className="w-4 h-4" />
-                                  </button>
+                                  </Link>
                                 </td>
                               </tr>
                             );
@@ -366,11 +405,11 @@ export default function DashboardPage() {
               >
                 <Card padding="none">
                   <CardHeader
-                    title="Markets"
+                    title={t('dashboard.markets')}
                     action={
-                      <Link href="/trade/BTC-USDT">
+                      <Link href="/markets/spot">
                         <Button variant="ghost" size="sm">
-                          View All
+                          {t('dashboard.viewAll')}
                         </Button>
                       </Link>
                     }
@@ -449,24 +488,26 @@ export default function DashboardPage() {
                 transition={{ delay: 0.5 }}
               >
                 <Card>
-                  <CardHeader title="Quick Stats" />
+                  <CardHeader title={t('dashboard.quickStats')} />
                   
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm">24h PnL</span>
-                      <span className="text-profit font-medium">+$2,847.32</span>
+                      <span className="text-gray-400 text-sm">{t('dashboard.pnl24h')}</span>
+                      <span className={cn('font-medium tabular-nums', totalChange >= 0 ? 'text-profit' : 'text-loss')}>
+                        {totalChange >= 0 ? '+' : ''}{formatPercent(totalChange)}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm">Total Trades</span>
-                      <span className="text-white font-medium">1,284</span>
+                      <span className="text-gray-400 text-sm">{t('dashboard.openOrders')}</span>
+                      <span className="text-white font-medium">{openOrders.length}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm">Win Rate</span>
-                      <span className="text-white font-medium">64.2%</span>
+                      <span className="text-gray-400 text-sm">{t('dashboard.yourAssets')}</span>
+                      <span className="text-white font-medium">{balances.length}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400 text-sm">Fee Tier</span>
-                      <Badge variant="brand">VIP 2</Badge>
+                      <Badge variant="brand">{user?.memberTier || 'Standard'}</Badge>
                     </div>
                   </div>
                 </Card>

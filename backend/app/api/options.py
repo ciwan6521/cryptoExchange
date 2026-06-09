@@ -17,6 +17,7 @@ from app.api.deps import get_current_user
 from app.api.deps_flags import require_trading_enabled
 from app.services.ledger_service import LedgerService, InsufficientBalanceError
 from app.services.market_data import get_market_data_service
+from app.models.trading import TradingPair
 
 router = APIRouter(prefix="/api/options", tags=["options"])
 logger = logging.getLogger("crypto4pro.options")
@@ -54,6 +55,21 @@ def _pnl(opt: OptionPosition, mark: Decimal) -> Decimal:
     else:
         payoff = max(opt.strike_price - mark, Decimal("0")) * opt.quantity
     return payoff - opt.premium_usdt
+
+
+@router.get("/assets")
+async def list_option_assets(db: AsyncSession = Depends(get_db)):
+    """Tradable assets for options — enabled USDT spot pairs."""
+    result = await db.execute(
+        select(TradingPair.base_asset)
+        .where(TradingPair.is_enabled == True, TradingPair.quote_asset == "USDT")
+        .order_by(TradingPair.symbol)
+    )
+    assets = [row[0] for row in result.all()]
+    return {
+        "assets": assets or ["BTC", "ETH", "SOL"],
+        "disclaimer": "Synthetic options — premiums and settlement are ledger-based, not exchange-traded contracts.",
+    }
 
 
 @router.get("/positions")

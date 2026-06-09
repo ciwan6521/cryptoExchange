@@ -4,7 +4,8 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { X, Copy, Check, Wallet, AlertTriangle, Loader2, ArrowRight, Clock, Shield, CreditCard, Building2, ChevronLeft, Send, CheckCircle2, Banknote, TrendingUp, Info, Zap } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
-import { depositApi, type PaymentMethod, type ChainInfo, type MethodRateInfo } from '@/lib/api';
+import { depositApi, ApiError, type PaymentMethod, type ChainInfo, type MethodRateInfo } from '@/lib/api';
+import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
 
 interface DepositModalProps {
@@ -139,6 +140,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const [selectedFiatCurrency, setSelectedFiatCurrency] = useState<string | null>(null);
   const [selectedFiatCategory, setSelectedFiatCategory] = useState<'p2p' | 'credit_card' | null>(null);
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
+
+  const [cardAmount, setCardAmount] = useState('');
+  const [cardLast4, setCardLast4] = useState('');
+  const [cardBrand, setCardBrand] = useState('visa');
+  const [cardSubmitting, setCardSubmitting] = useState(false);
+  const [cardSuccess, setCardSuccess] = useState(false);
 
   const [claimAmount, setClaimAmount] = useState('');
   const [claimSubmitting, setClaimSubmitting] = useState(false);
@@ -1157,11 +1164,58 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       );
     }
 
-    // Step 3: Credit Card (coming soon)
+    // Step 3: Credit Card deposit form
     if (selectedFiatCurrency && selectedFiatCategory === 'credit_card') {
+      const handleCardSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!cardAmount || parseFloat(cardAmount) <= 0) {
+          toast.error('Enter a valid amount');
+          return;
+        }
+        if (!/^\d{4}$/.test(cardLast4)) {
+          toast.error('Enter the last 4 digits of your card');
+          return;
+        }
+        setCardSubmitting(true);
+        try {
+          const res = await depositApi.requestCardDeposit({
+            amount: cardAmount,
+            currency: selectedFiatCurrency,
+            card_last4: cardLast4,
+            card_brand: cardBrand,
+          });
+          setCardSuccess(true);
+          toast.success(res.message || 'Card deposit request submitted');
+          setCardAmount('');
+          setCardLast4('');
+        } catch (err) {
+          toast.error(err instanceof ApiError ? err.detail : 'Card deposit failed');
+        } finally {
+          setCardSubmitting(false);
+        }
+      };
+
+      if (cardSuccess) {
+        return (
+          <div className="space-y-4 text-center py-8">
+            <CheckCircle2 className="w-12 h-12 text-profit mx-auto" />
+            <p className="text-sm font-medium text-white">Deposit request submitted</p>
+            <p className="text-xs text-gray-500">Your card deposit is pending review and will be credited after verification.</p>
+            <button
+              type="button"
+              onClick={() => { setCardSuccess(false); setSelectedFiatCategory(null); }}
+              className="text-xs text-brand-400 hover:underline"
+            >
+              Make another deposit
+            </button>
+          </div>
+        );
+      }
+
       return (
-        <div className="space-y-4">
+        <form onSubmit={handleCardSubmit} className="space-y-4">
           <button
+            type="button"
             onClick={() => setSelectedFiatCategory(null)}
             className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
           >
@@ -1175,14 +1229,57 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          <div className="text-center py-12">
-            <div className="w-14 h-14 rounded-2xl bg-surface-100 flex items-center justify-center mx-auto mb-4">
-              <CreditCard className="w-7 h-7 text-gray-500" />
-            </div>
-            <p className="text-sm font-medium text-gray-300 mb-1">Coming Soon</p>
-            <p className="text-xs text-gray-600">Credit card deposits will be available shortly.</p>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Amount ({selectedFiatCurrency})</label>
+            <input
+              required
+              type="number"
+              min="0"
+              step="any"
+              value={cardAmount}
+              onChange={e => setCardAmount(e.target.value)}
+              placeholder="100.00"
+              className="w-full bg-surface-100 border border-glass-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50"
+            />
           </div>
-        </div>
+
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Card last 4 digits</label>
+            <input
+              required
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              pattern="\d{4}"
+              value={cardLast4}
+              onChange={e => setCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="1234"
+              className="w-full bg-surface-100 border border-glass-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Card brand</label>
+            <select
+              value={cardBrand}
+              onChange={e => setCardBrand(e.target.value)}
+              className="w-full bg-surface-100 border border-glass-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500/50"
+            >
+              <option value="visa">Visa</option>
+              <option value="mastercard">Mastercard</option>
+              <option value="amex">American Express</option>
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            disabled={cardSubmitting}
+            className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {cardSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+            Submit Card Deposit
+          </button>
+        </form>
       );
     }
 

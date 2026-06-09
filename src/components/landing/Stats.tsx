@@ -3,39 +3,12 @@
 import React from 'react';
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { formatNumber } from '@/lib/utils';
+import { marketApi } from '@/lib/api';
 
 // ============================================
 // Stats Section
 // Key metrics and social proof
 // ============================================
-
-const stats = [
-  {
-    value: 100,
-    suffix: '+',
-    label: 'Trading Pairs',
-    description: 'Top cryptocurrencies available for trading',
-  },
-  {
-    value: 0.1,
-    suffix: '%',
-    label: 'Trading Fees',
-    description: 'Industry-low fees for makers and takers',
-  },
-  {
-    value: 24,
-    suffix: '/7',
-    label: 'Live Markets',
-    description: 'Non-stop trading around the clock',
-  },
-  {
-    value: 99.99,
-    suffix: '%',
-    label: 'Uptime',
-    description: 'Platform availability guarantee',
-  },
-];
 
 function AnimatedStat({
   value,
@@ -59,7 +32,7 @@ function AnimatedStat({
   React.useEffect(() => {
     if (!isInView) return;
     
-    const duration = 2000; // 2 seconds
+    const duration = 2000;
     const startTime = performance.now();
     
     const animate = (currentTime: number) => {
@@ -71,7 +44,6 @@ function AnimatedStat({
       }
       
       const progress = Math.min(elapsed / duration, 1);
-      // Ease out expo
       const easeProgress = 1 - Math.pow(1 - progress, 3);
       
       setDisplayValue(value * easeProgress);
@@ -108,10 +80,54 @@ function AnimatedStat({
 }
 
 export const Stats: React.FC = () => {
+  const [pairCount, setPairCount] = React.useState(0);
+  const [makerFeePercent, setMakerFeePercent] = React.useState(0.1);
+
+  React.useEffect(() => {
+    marketApi.getPairs()
+      .then((res) => {
+        const enabled = res.pairs.filter((p) => p.is_enabled);
+        const list = enabled.length > 0 ? enabled : res.pairs;
+        setPairCount(list.length);
+        if (list.length > 0) {
+          setMakerFeePercent(parseFloat(list[0].maker_fee) * 100);
+        }
+      })
+      .catch(() => {
+        setPairCount(0);
+      });
+  }, []);
+
+  const stats = [
+    {
+      value: pairCount || 0,
+      suffix: pairCount > 0 ? '' : '+',
+      label: 'Trading Pairs',
+      description: 'Top cryptocurrencies available for trading',
+    },
+    {
+      value: makerFeePercent,
+      suffix: '%',
+      label: 'Trading Fees',
+      description: 'Industry-low fees for makers and takers',
+    },
+    {
+      value: 24,
+      suffix: '/7',
+      label: 'Live Markets',
+      description: 'Non-stop trading around the clock',
+    },
+    {
+      value: 99.99,
+      suffix: '%',
+      label: 'Uptime',
+      description: 'Platform availability guarantee',
+    },
+  ];
+
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8 bg-surface-300/30">
       <div className="max-w-7xl mx-auto">
-        {/* Section header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -127,7 +143,6 @@ export const Stats: React.FC = () => {
           </p>
         </motion.div>
         
-        {/* Stats grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
           {stats.map((stat, index) => (
             <AnimatedStat
@@ -141,7 +156,6 @@ export const Stats: React.FC = () => {
           ))}
         </div>
         
-        {/* Trust indicators */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -166,4 +180,3 @@ export const Stats: React.FC = () => {
     </section>
   );
 };
-

@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminStore } from '@/stores/admin-store';
@@ -14,6 +15,15 @@ import { useAdminStore } from '@/stores/admin-store';
 // System overview with health indicators,
 // key metrics, and alert area.
 // ============================================
+
+interface HealthResponse {
+  status: string;
+  service: string;
+  env: string;
+  db: string;
+  redis: string;
+  celery: string;
+}
 
 function HealthIndicator({ label, status }: {
   label: string;
@@ -36,8 +46,39 @@ function HealthIndicator({ label, status }: {
   );
 }
 
+function mapComponentStatus(value: string | undefined): 'healthy' | 'degraded' | 'down' {
+  if (!value || value === 'ok') return 'healthy';
+  if (value === 'unknown' || value === 'no_workers') return 'degraded';
+  return 'down';
+}
+
 export default function AdminDashboard() {
   const { systemFlags } = useAdminStore();
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
+  const fetchHealth = useCallback(async () => {
+    setHealthLoading(true);
+    setHealthError(null);
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      setHealth(data);
+      if (!res.ok) {
+        setHealthError('Some services are degraded');
+      }
+    } catch {
+      setHealth(null);
+      setHealthError('Unable to reach API');
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHealth();
+  }, [fetchHealth]);
 
   const alerts: { type: 'warning' | 'error' | 'info'; message: string }[] = [];
   if (systemFlags.maintenanceMode) alerts.push({ type: 'error', message: 'Maintenance mode is ACTIVE — all user operations are paused.' });
@@ -45,6 +86,16 @@ export default function AdminDashboard() {
   if (!systemFlags.newOrdersEnabled) alerts.push({ type: 'warning', message: 'New order submission is DISABLED.' });
   if (!systemFlags.depositsEnabled) alerts.push({ type: 'warning', message: 'Deposits are DISABLED.' });
   if (!systemFlags.withdrawalsEnabled) alerts.push({ type: 'warning', message: 'Withdrawals are DISABLED.' });
+
+  const apiStatus = healthError
+    ? 'down' as const
+    : health?.status === 'ok'
+      ? 'healthy' as const
+      : health?.status === 'degraded'
+        ? 'degraded' as const
+        : healthLoading
+          ? 'degraded' as const
+          : 'down' as const;
 
   return (
     <div className="space-y-4">
@@ -74,14 +125,28 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* System Health */}
         <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3">
-          <h2 className="text-xs font-semibold text-white mb-2">System Health</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-semibold text-white">System Health</h2>
+            {healthLoading && <Loader2 className="w-3 h-3 text-gray-500 animate-spin" />}
+          </div>
+          {healthError && !healthLoading && (
+            <p className="text-[10px] text-red-400 mb-2">{healthError}</p>
+          )}
           <div className="divide-y divide-white/[0.04]">
-            <HealthIndicator label="REST API" status="healthy" />
-            <HealthIndicator label="WebSocket" status="healthy" />
-            <HealthIndicator label="Price Feed" status="healthy" />
+            <HealthIndicator label="REST API" status={apiStatus} />
+            <HealthIndicator label="Database" status={mapComponentStatus(health?.db)} />
+            <HealthIndicator label="Redis" status={mapComponentStatus(health?.redis)} />
+            <HealthIndicator label="Background Workers" status={mapComponentStatus(health?.celery)} />
             <HealthIndicator label="Matching Engine" status={systemFlags.tradingEnabled ? 'healthy' : 'down'} />
             <HealthIndicator label="Withdrawal Service" status={systemFlags.withdrawalsEnabled ? 'healthy' : 'degraded'} />
           </div>
+          <button
+            onClick={fetchHealth}
+            disabled={healthLoading}
+            className="mt-2 text-[10px] text-gray-500 hover:text-white underline disabled:opacity-50"
+          >
+            Refresh health
+          </button>
         </div>
 
         {/* System Flags Quick View */}

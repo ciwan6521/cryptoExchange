@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { IconButton } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { isEnabled } from '@/lib/feature-flags';
+import { useI18n } from '@/lib/i18n';
 
 // ============================================
 // Sidebar Component
@@ -36,28 +37,36 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-const mainNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Trade', href: '/trade/BTC-USDT', icon: LineChart },
-  ...(isEnabled('ENABLE_FUTURES') ? [{ name: 'Futures', href: '/futures', icon: TrendingUp }] : []),
-  { name: 'Convert', href: '/convert', icon: ArrowDownUp },
-  { name: 'P2P', href: '/p2p', icon: Users },
-  { name: 'Wallet', href: '/wallet', icon: Wallet },
-  { name: 'Earn', href: '/earn', icon: TrendingUp },
-  { name: 'T4PRO ICO', href: '/ico/t4pro', icon: Sparkles },
-  { name: 'Rewards', href: '/rewards', icon: Gift },
-  { name: 'Ledger', href: '/ledger', icon: History },
-];
+function buildMainNavigation(t: (key: string) => string) {
+  return [
+    { name: t('nav.dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    { name: t('nav.trade'), href: '/trade/BTC-USDT', icon: LineChart },
+    ...(isEnabled('ENABLE_FUTURES') ? [{ name: t('nav.futures'), href: '/futures', icon: TrendingUp }] : []),
+    { name: t('nav.convert'), href: '/convert', icon: ArrowDownUp },
+    { name: t('nav.p2p'), href: '/p2p', icon: Users },
+    { name: t('nav.options'), href: '/markets/options', icon: LineChart },
+    { name: t('nav.wallet'), href: '/wallet', icon: Wallet },
+    { name: t('nav.earn'), href: '/earn', icon: TrendingUp },
+    { name: t('nav.ico'), href: '/ico/t4pro', icon: Sparkles },
+    { name: t('nav.rewards'), href: '/rewards', icon: Gift },
+    { name: t('nav.ledger'), href: '/ledger', icon: History },
+  ];
+}
 
-const secondaryNavigation = [
-  { name: 'Settings', href: '/settings', icon: Settings },
-  { name: 'Markets', href: '/markets/spot', icon: TrendingUp },
-];
+function buildSecondaryNavigation(t: (key: string) => string) {
+  return [
+    { name: t('nav.settings'), href: '/settings', icon: Settings },
+    { name: t('nav.markets'), href: '/markets/spot', icon: TrendingUp },
+  ];
+}
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
+  const { t } = useI18n();
+  const mainNavigation = buildMainNavigation(t);
+  const secondaryNavigation = buildSecondaryNavigation(t);
   
   return (
     <AnimatePresence>
@@ -101,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               {/* Main navigation */}
               <div>
                 <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Main
+                  {t('sidebar.main')}
                 </p>
                 <div className="space-y-1">
                   {mainNavigation.map((item) => {
@@ -131,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               {/* Secondary navigation */}
               <div>
                 <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Account
+                  {t('sidebar.account')}
                 </p>
                 <div className="space-y-1">
                   {secondaryNavigation.map((item) => {
@@ -169,7 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 w-full transition-colors"
                 >
                   <X className="w-5 h-5" />
-                  Sign Out
+                  {t('sidebar.signOut')}
                 </button>
               </div>
             </nav>
@@ -183,6 +192,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 // Desktop sidebar (for dashboard pages)
 export const DesktopSidebar: React.FC = () => {
   const pathname = usePathname();
+  const { t } = useI18n();
+  const mainNavigation = buildMainNavigation(t);
+  const secondaryNavigation = buildSecondaryNavigation(t);
   
   return (
     <aside className="hidden lg:block fixed left-0 top-16 bottom-0 w-64 bg-surface-200/50 border-r border-glass-border">
@@ -190,7 +202,7 @@ export const DesktopSidebar: React.FC = () => {
         {/* Main navigation */}
         <div>
           <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Main
+            {t('sidebar.main')}
           </p>
           <div className="space-y-1">
             {mainNavigation.map((item) => {
@@ -219,7 +231,7 @@ export const DesktopSidebar: React.FC = () => {
         {/* Secondary navigation */}
         <div>
           <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Account
+            {t('sidebar.account')}
           </p>
           <div className="space-y-1">
             {secondaryNavigation.map((item) => {

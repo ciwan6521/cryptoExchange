@@ -32,6 +32,7 @@ export default function EarnPage() {
   const [products, setProducts] = useState<StakingProductItem[]>([]);
   const [positions, setPositions] = useState<StakingPositionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<StakingProductItem | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<StakingPeriodItem | null>(null);
   const [amount, setAmount] = useState('');
@@ -42,6 +43,7 @@ export default function EarnPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const prodRes = await stakingApi.getProducts();
       setProducts(prodRes.products || []);
@@ -54,8 +56,10 @@ export default function EarnPage() {
       } else {
         setPositions([]);
       }
-    } catch {
+    } catch (err) {
       setProducts([]);
+      setPositions([]);
+      setLoadError(err instanceof ApiError ? err.detail : 'Failed to load staking products');
     } finally {
       setLoading(false);
     }
@@ -257,6 +261,14 @@ export default function EarnPage() {
             {loading ? (
               <div className="flex justify-center py-16">
                 <Loader2 className="w-8 h-8 text-brand-400 animate-spin" />
+              </div>
+            ) : loadError ? (
+              <div className="text-center py-16 rounded-2xl border border-dashed border-red-500/20 bg-red-500/5 space-y-3">
+                <AlertTriangle className="w-8 h-8 text-red-400 mx-auto" />
+                <p className="text-sm text-red-400">{loadError}</p>
+                <button onClick={loadData} className="text-sm text-brand-400 hover:text-brand-300 underline">
+                  Retry
+                </button>
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-16 rounded-2xl border border-dashed border-white/[0.08]">

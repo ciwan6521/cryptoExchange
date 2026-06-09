@@ -178,7 +178,18 @@ async def login(body: LoginRequest, request: Request, response: Response, db: As
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
+    if user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        remaining = int((user.locked_until - datetime.now(timezone.utc)).total_seconds() / 60) + 1
+        raise HTTPException(status_code=423, detail=f"Account locked. Try again in {remaining} minutes.")
+
     if not user or not verify_password(body.password, user.password_hash):
+        if user:
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= settings.MAX_LOGIN_ATTEMPTS:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(
+                    minutes=settings.LOCKOUT_DURATION_MINUTES
+                )
+            await db.commit()
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if not user.is_active:
@@ -193,7 +204,9 @@ async def login(body: LoginRequest, request: Request, response: Response, db: As
         if not totp.verify(body.totp_code, valid_window=1):
             raise HTTPException(status_code=401, detail="Invalid 2FA code")
 
-    # Update last login
+    # Success — reset lockout counters and update last login
+    user.failed_login_attempts = 0
+    user.locked_until = None
     user.last_login_at = datetime.now(timezone.utc)
     user.last_login_ip = request.client.host if request.client else None
 

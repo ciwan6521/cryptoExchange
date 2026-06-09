@@ -9,6 +9,8 @@ import { ArrowRight } from 'lucide-react';
 import { Features, MarketTicker, Stats, CTA, FAQ } from '@/components/landing';
 import { Button, Skeleton } from '@/components/ui';
 import { isEnabled } from '@/lib/feature-flags';
+import { useAuthStore } from '@/stores/auth-store';
+import { leverageApi } from '@/lib/api';
 
 // ============================================
 // Landing Page Client Content
@@ -36,6 +38,19 @@ function HeroFallback() {
 
 export function LandingHero() {
   const show3D = isEnabled('ENABLE_3D_HERO');
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const [futuresBadge, setFuturesBadge] = React.useState('up to 125x on BTC');
+
+  React.useEffect(() => {
+    if (!isEnabled('ENABLE_FUTURES')) return;
+    leverageApi.getConfig()
+      .then((cfg) => {
+        const btc = cfg.pairs.find((p) => p.base_asset === 'BTC');
+        const max = btc?.max_leverage ?? cfg.max_leverage ?? 125;
+        setFuturesBadge(`up to ${max}x on BTC`);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
@@ -98,7 +113,7 @@ export function LandingHero() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-500" />
               </span>
-              New: Futures trading now live with up to 100x leverage
+              New: Futures trading now live with {futuresBadge} leverage
             </span>
           </motion.div>
           )}
@@ -118,16 +133,29 @@ export function LandingHero() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <Link href="/auth/register">
-              <Button
-                size="lg"
-                icon={<ArrowRight className="w-5 h-5" />}
-                iconPosition="right"
-                className="shadow-lg shadow-brand-500/25"
-              >
-                Start Trading Now
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <Link href="/dashboard">
+                <Button
+                  size="lg"
+                  icon={<ArrowRight className="w-5 h-5" />}
+                  iconPosition="right"
+                  className="shadow-lg shadow-brand-500/25"
+                >
+                  Go to Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/auth/register">
+                <Button
+                  size="lg"
+                  icon={<ArrowRight className="w-5 h-5" />}
+                  iconPosition="right"
+                  className="shadow-lg shadow-brand-500/25"
+                >
+                  Start Trading Now
+                </Button>
+              </Link>
+            )}
             <Link href="/ico/t4pro">
               <Button
                 variant="secondary"

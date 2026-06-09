@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models.trading import TradingPair
 from app.models.cms import SystemFlag
@@ -45,6 +46,37 @@ async def get_trading_pairs(db: AsyncSession = Depends(get_db)):
             }
             for p in pairs
         ]
+    }
+
+
+@router.get("/fees")
+async def get_fee_schedule(db: AsyncSession = Depends(get_db)):
+    """Public fee schedule derived from trading pair configuration."""
+    result = await db.execute(
+        select(TradingPair).where(TradingPair.is_enabled == True).order_by(TradingPair.symbol)
+    )
+    pairs = list(result.scalars().all())
+    if not pairs:
+        maker = taker = Decimal("0.001")
+    else:
+        maker = pairs[0].maker_fee
+        taker = pairs[0].taker_fee
+    return {
+        "spot": {
+            "maker_fee": str(maker),
+            "taker_fee": str(taker),
+            "maker_percent": f"{float(maker) * 100:.2f}%",
+            "taker_percent": f"{float(taker) * 100:.2f}%",
+        },
+        "pairs": [
+            {
+                "symbol": p.symbol,
+                "maker_fee": str(p.maker_fee),
+                "taker_fee": str(p.taker_fee),
+            }
+            for p in pairs
+        ],
+        "withdrawal_fee_usdt": settings.WITHDRAWAL_FEE_USDT,
     }
 
 

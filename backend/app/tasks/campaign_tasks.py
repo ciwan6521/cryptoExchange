@@ -85,11 +85,3 @@ async def _drain_queue():
     finally:
         await r.close()
 
-
-# Celery beat schedule
-celery_app.conf.beat_schedule = {
-    "process-event-queue": {
-        "task": "app.tasks.campaign_tasks.process_event_queue",
-        "schedule": 5.0,  # Every 5 seconds
-    },
-}

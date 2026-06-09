@@ -23,7 +23,7 @@ Risk prevented:
 """
 
 import uuid
-import hashlib
+import asyncio
 import logging
 from decimal import Decimal, ROUND_DOWN
 from datetime import datetime, timezone
@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 
 from app.models.trading import TradingPair, Order, Trade
 from app.models.user import User
+from app.events.bus import EventBus
 from app.services.ledger_service import LedgerService, InsufficientBalanceError
 
 logger = logging.getLogger("crypto4pro.matching")
@@ -373,6 +374,63 @@ class MatchingEngine:
 
         return trade
 
+    async def _publish_trade_events(self, trades: list[Trade], pair: TradingPair) -> None:
+        """Publish trade_executed events for taker and maker on each fill."""
+        if not trades:
+            return
+        try:
+            bus = await EventBus.get_instance()
+            for trade in trades:
+                taker_side = trade.side
+                maker_side = "sell" if taker_side == "buy" else "buy"
+                taker_fee_asset = pair.base_asset if taker_side == "buy" else pair.quote_asset
+                maker_fee_asset = pair.quote_asset if taker_side == "buy" else pair.base_asset
+                taker_fee = trade.taker_fee
+                maker_fee = trade.maker_fee
+
+                await bus.publish_trade_executed(
+                    user_id=str(trade.taker_user_id),
+                    trade_id=str(trade.id),
+                    symbol=trade.symbol,
+                    side=taker_side,
+                    quantity=str(trade.quantity),
+                    quote_quantity=str(trade.quote_quantity),
+                    fee=str(taker_fee),
+                    fee_asset=taker_fee_asset,
+                )
+                await bus.publish_trade_executed(
+                    user_id=str(trade.maker_user_id),
+                    trade_id=str(trade.id),
+                    symbol=trade.symbol,
+                    side=maker_side,
+                    quantity=str(trade.quantity),
+                    quote_quantity=str(trade.quote_quantity),
+                    fee=str(maker_fee),
+                    fee_asset=maker_fee_asset,
+                )
+        except Exception:
+            logger.exception("Failed to publish trade events")
+
+    async def _broadcast_fills(self, trades: list[Trade], symbol: str) -> None:
+        """Push order book and trade updates to WebSocket clients."""
+        if not trades:
+            return
+        try:
+            from app.api.ws import broadcast_orderbook_update, broadcast_trade
+
+            asyncio.create_task(broadcast_orderbook_update(symbol))
+            for trade in trades:
+                trade_data = {
+                    "id": str(trade.id),
+                    "price": str(trade.price),
+                    "quantity": str(trade.quantity),
+                    "side": trade.side,
+                    "time": trade.executed_at.isoformat() if trade.executed_at else None,
+                }
+                asyncio.create_task(broadcast_trade(symbol, trade_data))
+        except Exception:
+            logger.exception("Failed to broadcast WS updates for %s", symbol)
+
     # ── Public API ────────────────────────────────────────────
 
     async def place_order(
@@ -446,6 +504,49 @@ class MatchingEngine:
 
             # If fully filled, order is already marked as "filled" by _execute_fill
             await self.db.flush()
+
+        await self._publish_trade_events(trades, pair)
+        await self._broadcast_fills(trades, pair.symbol)
+
+        return {
+            "order": order,
+            "trades": trades,
+            "fills_count": len(trades),
+        }
+
+    async def match_open_order(self, order: Order) -> dict:
+        """
+        Match an already-open order with funds already locked.
+        Used when stop-limit orders are activated into the book.
+        """
+        if order.status not in ("open", "partially_filled"):
+            return {"order": order, "trades": [], "fills_count": 0}
+
+        pair = await self._get_pair(order.symbol)
+        trades: list[Trade] = []
+
+        with self.db.no_autoflush:
+            if order.remaining > Decimal("0"):
+                matching_orders = await self._get_matching_orders(
+                    pair, order.side, order.price, order.order_type
+                )
+
+                for maker in matching_orders:
+                    if order.remaining <= Decimal("0"):
+                        break
+                    if maker.user_id == order.user_id:
+                        continue
+
+                    fill_qty = min(order.remaining, maker.remaining)
+                    fill_price = maker.price
+
+                    trade = await self._execute_fill(order, maker, pair, fill_qty, fill_price)
+                    trades.append(trade)
+
+            await self.db.flush()
+
+        await self._publish_trade_events(trades, pair)
+        await self._broadcast_fills(trades, pair.symbol)
 
         return {
             "order": order,

@@ -14,6 +14,7 @@ interface BalanceState {
   lastFetched: number | null;
 
   fetchBalances: () => Promise<void>;
+  updateFromWs: (balances: BalanceItem[]) => void;
   clear: () => void;
 }
 
@@ -38,6 +39,8 @@ export const useBalanceStore = create<BalanceState>()((set, get) => ({
       set({ isLoading: false });
     }
   },
+
+  updateFromWs: (balances) => set({ balances, lastFetched: Date.now(), error: null }),
 
   clear: () => set({ balances: [], lastFetched: null, error: null }),
 }));

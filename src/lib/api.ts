@@ -333,6 +333,21 @@ export const marketApi = {
     request<{ flags: SystemFlags }>('/api/market/flags'),
 };
 
+export interface MarketFeesResponse {
+  spot: {
+    maker_fee: string;
+    taker_fee: string;
+    maker_percent: string;
+    taker_percent: string;
+  };
+  pairs: Array<{ symbol: string; maker_fee: string; taker_fee: string }>;
+  withdrawal_fee_usdt: string;
+}
+
+export const marketFeesApi = {
+  getFees: () => request<MarketFeesResponse>('/api/market/fees'),
+};
+
 // ============================================
 // Trading Read API
 // ============================================
@@ -635,7 +650,15 @@ export const depositApi = {
       `/api/market/payment-method-rate/${encodeURIComponent(paymentMethodId)}${qs}`,
     );
   },
+
+  requestCardDeposit: (data: { amount: string; currency: string; card_last4: string; card_brand: string }) =>
+    request<{ ok: boolean; deposit: { id: string; amount: string; currency: string; status: string }; message: string }>(
+      '/api/deposits/card',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
 };
+
+export const depositsApi = depositApi;
 
 // ============================================
 // Staking API
@@ -703,6 +726,7 @@ export interface LeveragePairItem {
   symbol: string;
   base_asset: string;
   quote_asset: string;
+  max_leverage?: number;
 }
 
 export interface LeverageConfigResponse {
@@ -710,6 +734,9 @@ export interface LeverageConfigResponse {
   max_leverage: number;
   min_margin_usdt: string;
   maintenance_margin_rate: string;
+  funding_rate?: string;
+  funding_interval_hours?: number;
+  disclaimer?: string;
   pairs: LeveragePairItem[];
 }
 
@@ -770,10 +797,19 @@ export const leverageApi = {
       { method: 'POST', body: JSON.stringify(data) },
     ),
 
-  close: (positionId: string) =>
+  close: (positionId: string, percent = 100) =>
     request<{ ok: boolean; position: LeveragePositionItem }>(
       `/api/leverage/positions/${positionId}/close`,
-      { method: 'POST' },
+      {
+        method: 'POST',
+        body: JSON.stringify({ percent }),
+      },
+    ),
+
+  addMargin: (positionId: string, marginUsdt: string) =>
+    request<{ ok: boolean; position: LeveragePositionItem }>(
+      `/api/leverage/positions/${positionId}/add-margin`,
+      { method: 'POST', body: JSON.stringify({ margin_usdt: marginUsdt }) },
     ),
 };
 
@@ -871,6 +907,17 @@ export const convertApi = {
 export const referralApi = {
   getMe: () => request<{ referral_code: string; referral_link: string; total_referrals: number }>('/api/referral/me'),
   validate: (code: string) => request<{ valid: boolean; referrer_username: string }>(`/api/referral/validate/${code}`),
+  getHistory: () =>
+    request<{
+      referrals: Array<{
+        user_id: string;
+        username: string;
+        email: string;
+        kyc_status: string;
+        joined_at: string | null;
+      }>;
+      total: number;
+    }>('/api/referral/history'),
 };
 
 // ============================================
@@ -937,6 +984,13 @@ export const launchpadApi = {
 // P2P
 // ============================================
 
+export const referralHistoryApi = referralApi;
+
+export const p2pConfigApi = {
+  getConfig: () =>
+    request<{ fiat_currencies: string[]; payment_methods: string[] }>('/api/p2p/config'),
+};
+
 export const p2pApi = {
   listAds: (params?: { side?: string; asset?: string }) => {
     const qs = new URLSearchParams(params as Record<string, string>).toString();
@@ -953,11 +1007,32 @@ export const p2pApi = {
   myOrders: () => request<{ orders: Array<{ id: string; asset: string; amount: string; total_fiat: string; status: string; role: string }> }>('/api/p2p/orders'),
   confirm: (orderId: string) => request<{ ok: boolean }>(`/api/p2p/orders/${orderId}/confirm`, { method: 'POST' }),
   cancel: (orderId: string) => request<{ ok: boolean }>(`/api/p2p/orders/${orderId}/cancel`, { method: 'POST' }),
+  markPaid: (orderId: string) =>
+    request<{ ok: boolean; status: string }>(`/api/p2p/orders/${orderId}/mark-paid`, { method: 'POST' }),
+  dispute: (orderId: string, reason: string) =>
+    request<{ ok: boolean; status: string }>(`/api/p2p/orders/${orderId}/dispute`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  getMessages: (orderId: string) =>
+    request<{ messages: Array<{ id: string; user_id: string; body: string; created_at: string; is_mine: boolean }> }>(
+      `/api/p2p/orders/${orderId}/messages`,
+    ),
+  sendMessage: (orderId: string, body: string) =>
+    request<{ ok: boolean; message: { id: string; user_id: string; body: string; created_at: string; is_mine: boolean } }>(
+      `/api/p2p/orders/${orderId}/messages`,
+      { method: 'POST', body: JSON.stringify({ body }) },
+    ),
 };
 
 // ============================================
 // Options
 // ============================================
+
+export const optionsAssetsApi = {
+  getAssets: () =>
+    request<{ assets: string[]; disclaimer?: string }>('/api/options/assets'),
+};
 
 export const optionsApi = {
   getPositions: () => request<{ positions: Array<{ id: string; asset: string; option_type: string; strike_price: string; premium_usdt: string; quantity: string; expiry_at: string; status: string; unrealized_pnl: string | null }> }>('/api/options/positions'),

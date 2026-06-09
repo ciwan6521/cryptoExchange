@@ -2,6 +2,8 @@ import type { WSMessage, TradingPair, Orderbook, Trade } from '@/types';
 import { generateId } from './utils';
 import { isEnabled } from './feature-flags';
 import { useTradingStore, type ConnectionStatus } from '@/stores/trading-store';
+import { useBalanceStore } from '@/stores/balance-store';
+import { useOrderStore } from '@/stores/order-store';
 
 // ============================================
 // WebSocket Abstraction Layer
@@ -584,4 +586,92 @@ export function getWebSocket(): ExchangeWebSocket {
 }
 
 export type { ExchangeWebSocket };
+
+// ============================================
+// User private WebSocket — balances & open orders
+// ============================================
+
+interface UserSnapshotMessage {
+  type: 'user_snapshot';
+  balances: Array<{ asset: string; available: string; locked: string }>;
+  open_orders: Array<{
+    id: string;
+    symbol: string;
+    side: string;
+    status: string;
+    price: string | null;
+    quantity: string;
+    remaining: string;
+  }>;
+}
+
+let userWs: WebSocket | null = null;
+let userWsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let userWsShouldConnect = false;
+
+function getUserWsUrl(): string {
+  const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
+  return `${proto}//${host}/ws/user`;
+}
+
+function handleUserSnapshot(data: UserSnapshotMessage): void {
+  if (data.type !== 'user_snapshot') return;
+  useBalanceStore.getState().updateFromWs(data.balances);
+  useOrderStore.getState().updateOpenOrdersFromWs(data.open_orders);
+}
+
+function scheduleUserWsReconnect(): void {
+  if (!userWsShouldConnect) return;
+  if (userWsReconnectTimer) clearTimeout(userWsReconnectTimer);
+  userWsReconnectTimer = setTimeout(() => {
+    if (userWsShouldConnect) connectUserChannel();
+  }, 3000);
+}
+
+export function connectUserChannel(): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  userWsShouldConnect = true;
+
+  if (userWs && (userWs.readyState === WebSocket.OPEN || userWs.readyState === WebSocket.CONNECTING)) {
+    return disconnectUserChannel;
+  }
+
+  const ws = new WebSocket(getUserWsUrl());
+  userWs = ws;
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data as string) as UserSnapshotMessage | { type: 'pong' };
+      if (data.type === 'pong') return;
+      handleUserSnapshot(data as UserSnapshotMessage);
+    } catch {
+      /* ignore malformed messages */
+    }
+  };
+
+  ws.onclose = () => {
+    userWs = null;
+    scheduleUserWsReconnect();
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+
+  return disconnectUserChannel;
+}
+
+export function disconnectUserChannel(): void {
+  userWsShouldConnect = false;
+  if (userWsReconnectTimer) {
+    clearTimeout(userWsReconnectTimer);
+    userWsReconnectTimer = null;
+  }
+  if (userWs) {
+    try { userWs.close(); } catch { /* ignore */ }
+    userWs = null;
+  }
+}
 

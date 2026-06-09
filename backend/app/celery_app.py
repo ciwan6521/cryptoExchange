@@ -48,4 +48,20 @@ celery.conf.beat_schedule = {
         "task": "app.tasks.pay4pro_tasks.poll_pending_withdrawals",
         "schedule": 300,
     },
+    "process-event-queue": {
+        "task": "app.tasks.campaign_tasks.process_event_queue",
+        "schedule": 5.0,
+    },
+    "leverage-liquidation-sweep": {
+        "task": "app.tasks.leverage_tasks.sweep_liquidations",
+        "schedule": 60.0,
+    },
+    "options-expiry": {
+        "task": "app.tasks.options_tasks.expire_options",
+        "schedule": 300.0,
+    },
+    "market-maker-refresh": {
+        "task": "app.tasks.market_maker.refresh_quotes",
+        "schedule": 120.0,
+    },
 }

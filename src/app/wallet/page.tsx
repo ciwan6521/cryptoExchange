@@ -11,12 +11,20 @@ import {
   TrendingUp,
   ArrowRightLeft,
   AlertCircle,
+  Plus,
+  Send,
 } from 'lucide-react';
 import { Header, Sidebar } from '@/components/layout';
 import { Card, Button, Skeleton, CoinIcon } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
+import { useAdminStore } from '@/stores/admin-store';
+import { useUserFlags } from '@/hooks/useUserFlags';
+import { isEnabled } from '@/lib/feature-flags';
 import { walletApi, type WalletAsset } from '@/lib/api';
+import { DepositModal } from '@/components/modals/DepositModal';
+import { WithdrawModal } from '@/components/modals/WithdrawModal';
+import { useI18n } from '@/lib/i18n';
 
 function formatUsd(value: string | null): string {
   if (!value) return '—';
@@ -58,7 +66,12 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { depositsEnabled, withdrawalsEnabled } = useAdminStore((s) => s.systemFlags);
+  const { userWithdrawalsEnabled } = useUserFlags();
+  const { t } = useI18n();
 
   const fetchWallet = useCallback(async (showRefresh = false) => {
     if (!isAuthenticated) return;
@@ -103,8 +116,8 @@ export default function WalletPage() {
                 <Wallet className="w-5 h-5 text-brand-400" />
               </div>
               <div>
-                <h1 className="text-2xl font-display font-bold text-white">Wallet</h1>
-                <p className="text-sm text-gray-400">Manage your crypto portfolio</p>
+                <h1 className="text-2xl font-display font-bold text-white">{t('wallet.title')}</h1>
+                <p className="text-sm text-gray-400">{t('wallet.subtitle')}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -133,7 +146,7 @@ export default function WalletPage() {
             <Card className="bg-gradient-to-br from-surface-400 to-surface-500 border border-white/5 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400 mb-1">Total Portfolio Value</p>
+                  <p className="text-sm text-gray-400 mb-1">{t('wallet.totalValue')}</p>
                   {loading ? (
                     <Skeleton className="h-10 w-48" />
                   ) : (
@@ -142,7 +155,32 @@ export default function WalletPage() {
                     </h2>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {isEnabled('ENABLE_DEPOSIT') && (
+                    <Button
+                      variant="secondary"
+                      icon={<Plus className="w-4 h-4" />}
+                      disabled={!depositsEnabled}
+                      onClick={() => setDepositOpen(true)}
+                    >
+                      {depositsEnabled ? 'Deposit' : 'Deposits Paused'}
+                    </Button>
+                  )}
+                  {isEnabled('ENABLE_WITHDRAW') && (
+                    <Button
+                      variant="secondary"
+                      icon={<Send className="w-4 h-4" />}
+                      disabled={!withdrawalsEnabled || !userWithdrawalsEnabled}
+                      onClick={() => setWithdrawOpen(true)}
+                    >
+                      {!withdrawalsEnabled ? 'Withdrawals Paused' : !userWithdrawalsEnabled ? 'Withdrawals Restricted' : 'Withdraw'}
+                    </Button>
+                  )}
+                  <Link href="/ledger?category=withdrawal">
+                    <Button variant="ghost" size="sm">
+                      {t('wallet.withdrawHistory')}
+                    </Button>
+                  </Link>
                   <Link href="/trade/BTC-USDT">
                     <Button variant="primary" icon={<ArrowRightLeft className="w-4 h-4" />}>
                       Trade
@@ -178,13 +216,13 @@ export default function WalletPage() {
             transition={{ delay: 0.1 }}
           >
             <Card className="bg-surface-400 border border-white/5 overflow-hidden">
-              {/* Table Header */}
-              <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-white/5 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <div className="col-span-3">Asset</div>
-                <div className="col-span-2 text-right">Balance</div>
-                <div className="col-span-2 text-right">Locked</div>
-                <div className="col-span-2 text-right">Price (USD)</div>
-                <div className="col-span-3 text-right">Value (USD)</div>
+              {/* Desktop table header */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-white/5 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div className="col-span-3">{t('wallet.asset')}</div>
+                <div className="col-span-2 text-right">{t('wallet.balance')}</div>
+                <div className="col-span-2 text-right">{t('wallet.locked')}</div>
+                <div className="col-span-2 text-right">{t('wallet.price')}</div>
+                <div className="col-span-3 text-right">{t('wallet.value')}</div>
               </div>
 
               {/* Loading Skeleton */}
@@ -220,12 +258,12 @@ export default function WalletPage() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.03 }}
                         className={cn(
-                          'grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors',
+                          'px-4 sm:px-6 py-4 transition-colors',
+                          'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 md:gap-4 md:items-center',
                           hasBalance ? 'hover:bg-white/5' : 'opacity-60 hover:opacity-80 hover:bg-white/3'
                         )}
                       >
-                        {/* Asset Info */}
-                        <div className="col-span-3 flex items-center gap-3">
+                        <div className="md:col-span-3 flex items-center gap-3">
                           <CoinIcon symbol={asset.symbol} size={40} />
                           <div>
                             <p className="text-sm font-semibold text-white">{asset.symbol}</p>
@@ -233,8 +271,8 @@ export default function WalletPage() {
                           </div>
                         </div>
 
-                        {/* Balance */}
-                        <div className="col-span-2 text-right">
+                        <div className="md:col-span-2 md:text-right">
+                          <p className="text-[10px] uppercase text-gray-600 md:hidden">{t('wallet.balance')}</p>
                           <p className="text-sm text-white font-mono">
                             {balanceHidden ? '••••' : formatBalance(asset.total)}
                           </p>
@@ -245,8 +283,8 @@ export default function WalletPage() {
                           )}
                         </div>
 
-                        {/* Locked */}
-                        <div className="col-span-2 text-right">
+                        <div className="md:col-span-2 md:text-right">
+                          <p className="text-[10px] uppercase text-gray-600 md:hidden">{t('wallet.locked')}</p>
                           <p className={cn(
                             'text-sm font-mono',
                             parseFloat(asset.locked) > 0 ? 'text-amber-400' : 'text-gray-600'
@@ -255,15 +293,15 @@ export default function WalletPage() {
                           </p>
                         </div>
 
-                        {/* Price */}
-                        <div className="col-span-2 text-right">
+                        <div className="md:col-span-2 md:text-right">
+                          <p className="text-[10px] uppercase text-gray-600 md:hidden">{t('wallet.price')}</p>
                           <p className="text-sm text-gray-300 font-mono">
                             {formatPrice(asset.price_usd)}
                           </p>
                         </div>
 
-                        {/* Value */}
-                        <div className="col-span-3 text-right">
+                        <div className="md:col-span-3 md:text-right">
+                          <p className="text-[10px] uppercase text-gray-600 md:hidden">{t('wallet.value')}</p>
                           <p className={cn(
                             'text-sm font-mono font-semibold',
                             hasBalance ? 'text-white' : 'text-gray-600'
@@ -291,10 +329,12 @@ export default function WalletPage() {
           {/* Info footer */}
           <div className="mt-6 flex items-center gap-2 text-xs text-gray-500">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>Prices updated in real-time.</span>
+            <span>{t('wallet.pricesNote')}</span>
           </div>
         </div>
       </main>
+      <DepositModal isOpen={depositOpen} onClose={() => setDepositOpen(false)} />
+      <WithdrawModal isOpen={withdrawOpen} onClose={() => setWithdrawOpen(false)} />
     </div>
   );
 }
