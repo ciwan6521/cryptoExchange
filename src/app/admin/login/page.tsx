@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Lock, Mail, ArrowRight, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,12 @@ import { adminAuthApi, AdminApiError } from '@/lib/admin-api';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { adminLogin, set2FAPending } = useAdminStore();
+  const { adminLogin, set2FAPending, adminLogout } = useAdminStore();
+
+  // Clear stale persisted admin session so layout hook order stays stable
+  useEffect(() => {
+    adminLogout();
+  }, [adminLogout]);
 
   const [step, setStep] = useState<'credentials' | '2fa'>('credentials');
   const [email, setEmail] = useState('');

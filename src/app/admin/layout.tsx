@@ -103,6 +103,7 @@ const ROLE_COLORS: Record<string, string> = {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const {
     isAdminAuthenticated,
     adminUser,
@@ -133,7 +134,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const permissions = getPermissions();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex">
