@@ -20,7 +20,7 @@ import { useBalanceStore } from '@/stores/balance-store';
 import { useTickers } from '@/hooks';
 import { isEnabled } from '@/lib/feature-flags';
 import { toast } from 'sonner';
-import { TradingViewChart, toTradingViewSymbol } from '@/components/trading';
+import { TradingViewChart, toTradingViewSymbol, TradingErrorBoundary } from '@/components/trading';
 
 const LEVERAGE_STEPS = [1, 2, 3, 5, 10, 20, 25, 50, 75, 100];
 
@@ -267,7 +267,12 @@ export default function FuturesPage() {
           </div>
           <div className="h-[360px]">
             {markPrice > 0 ? (
-              <TradingViewChart symbol={toTradingViewSymbol(selectedSymbol)} />
+              <TradingErrorBoundary componentName="Futures Chart">
+                <TradingViewChart
+                  key={selectedSymbol}
+                  symbol={toTradingViewSymbol(selectedSymbol)}
+                />
+              </TradingErrorBoundary>
             ) : (
               <div className="h-full flex items-center justify-center text-sm text-gray-500">
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />

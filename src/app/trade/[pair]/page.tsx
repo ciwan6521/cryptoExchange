@@ -353,7 +353,10 @@ export default function TradingPage() {
               <div className="flex-1 min-h-[360px]">
                 <TradingErrorBoundary componentName="Chart">
                   {chartMode === 'tradingview' ? (
-                    <TradingViewChart symbol={toTradingViewSymbol(dashSymbol)} />
+                    <TradingViewChart
+                      key={dashSymbol}
+                      symbol={toTradingViewSymbol(dashSymbol)}
+                    />
                   ) : ticker ? (
                     <TradingChart
                       symbol={symbol}

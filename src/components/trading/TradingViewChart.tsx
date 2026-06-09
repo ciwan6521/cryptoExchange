@@ -1,15 +1,54 @@
 'use client';
 
-import React, { useEffect, useId, useRef } from 'react';
-import Script from 'next/script';
+import React, { useCallback, useEffect, useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
+
+type TradingViewWidget = {
+  remove?: () => void;
+};
 
 declare global {
   interface Window {
     TradingView?: {
-      widget: (options: Record<string, unknown>) => void;
+      widget: new (options: Record<string, unknown>) => TradingViewWidget;
     };
   }
+}
+
+const TV_SCRIPT_ID = 'tradingview-tv-js';
+const TV_SCRIPT_SRC = 'https://s3.tradingview.com/tv.js';
+
+let tvScriptPromise: Promise<void> | null = null;
+
+function loadTradingViewScript(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return Promise.resolve();
+  }
+  if (window.TradingView) {
+    return Promise.resolve();
+  }
+  if (tvScriptPromise) {
+    return tvScriptPromise;
+  }
+
+  tvScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.getElementById(TV_SCRIPT_ID) as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('TradingView script failed')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = TV_SCRIPT_ID;
+    script.src = TV_SCRIPT_SRC;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('TradingView script failed'));
+    document.head.appendChild(script);
+  });
+
+  return tvScriptPromise;
 }
 
 interface TradingViewChartProps {
@@ -26,13 +65,28 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   const reactId = useId();
   const containerId = `tradingview_${reactId.replace(/:/g, '_')}`;
   const containerRef = useRef<HTMLDivElement>(null);
-  const scriptReady = useRef(false);
-  const widgetMounted = useRef(false);
+  const widgetRef = useRef<TradingViewWidget | null>(null);
 
-  const mountWidget = () => {
-    if (widgetMounted.current || !containerRef.current || !window.TradingView) return;
-    containerRef.current.innerHTML = '';
-    window.TradingView.widget({
+  const destroyWidget = useCallback(() => {
+    if (widgetRef.current?.remove) {
+      try {
+        widgetRef.current.remove();
+      } catch {
+        // TradingView may already be torn down
+      }
+    }
+    widgetRef.current = null;
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+    }
+  }, []);
+
+  const mountWidget = useCallback(() => {
+    if (!containerRef.current || !window.TradingView) return;
+
+    destroyWidget();
+
+    widgetRef.current = new window.TradingView.widget({
       autosize: true,
       symbol,
       interval,
@@ -49,26 +103,27 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       backgroundColor: '#0a0a0f',
       gridColor: 'rgba(255,255,255,0.06)',
     });
-    widgetMounted.current = true;
-  };
+  }, [containerId, destroyWidget, interval, symbol]);
 
   useEffect(() => {
-    widgetMounted.current = false;
-    if (scriptReady.current) {
-      mountWidget();
-    }
-  }, [symbol, interval]);
+    let cancelled = false;
+
+    loadTradingViewScript()
+      .then(() => {
+        if (!cancelled) mountWidget();
+      })
+      .catch(() => {
+        // Chart stays empty; error boundary / parent can show fallback
+      });
+
+    return () => {
+      cancelled = true;
+      destroyWidget();
+    };
+  }, [destroyWidget, mountWidget]);
 
   return (
     <div className={cn('relative w-full h-full min-h-[400px]', className)}>
-      <Script
-        src="https://s3.tradingview.com/tv.js"
-        strategy="lazyOnload"
-        onLoad={() => {
-          scriptReady.current = true;
-          mountWidget();
-        }}
-      />
       <div id={containerId} ref={containerRef} className="absolute inset-0" />
     </div>
   );
