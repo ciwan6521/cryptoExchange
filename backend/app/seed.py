@@ -268,7 +268,7 @@ async def seed():
                 db.add(mm_user)
                 await db.flush()
                 for asset in ("USDT", "BTC", "ETH", "SOL", "XRP", "DOGE"):
-                    db.add(Account(user_id=mm_user.id, asset=asset, available_balance=0, locked_balance=0))
+                    db.add(Account(user_id=mm_user.id, asset=asset))
                 print(f"  [+] Market maker user: {MM_EMAIL}")
             else:
                 print(f"  [=] Market maker exists: {MM_EMAIL}")

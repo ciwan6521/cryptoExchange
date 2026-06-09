@@ -74,7 +74,7 @@ async def _find_or_create_oauth_user(db: AsyncSession, email: str, name: str) ->
     await db.flush()
 
     for asset in ("USDT", "BTC", "ETH"):
-        db.add(Account(user_id=user.id, asset=asset, available_balance=0, locked_balance=0))
+        db.add(Account(user_id=user.id, asset=asset))
 
     return user
 

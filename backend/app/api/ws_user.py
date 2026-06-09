@@ -42,11 +42,11 @@ async def _user_snapshot(user_id: uuid.UUID) -> dict:
         "balances": [
             {
                 "asset": a.asset,
-                "available": str(a.available_balance),
-                "locked": str(a.locked_balance),
+                "available": str(a.available),
+                "locked": str(a.locked),
             }
             for a in accounts
-            if a.available_balance > 0 or a.locked_balance > 0
+            if a.available > 0 or a.locked > 0
         ],
         "open_orders": [
             {
