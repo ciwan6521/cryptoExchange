@@ -81,28 +81,31 @@ const getBankLogo = (method: { type: string; config?: Record<string, unknown>; n
   return null;
 };
 
-const FLAG_CDN = 'https://flagcdn.com/w80';
-const CURRENCY_FLAG: Record<string, string> = {
-  TRY: `${FLAG_CDN}/tr.png`,
-  USD: `${FLAG_CDN}/us.png`,
-  EUR: `${FLAG_CDN}/eu.png`,
-  GBP: `${FLAG_CDN}/gb.png`,
-  RUB: `${FLAG_CDN}/ru.png`,
-  AED: `${FLAG_CDN}/ae.png`,
-  JPY: `${FLAG_CDN}/jp.png`,
-  CHF: `${FLAG_CDN}/ch.png`,
-  CAD: `${FLAG_CDN}/ca.png`,
-  AUD: `${FLAG_CDN}/au.png`,
+const CURRENCY_META: Record<string, { symbol: string; name: string }> = {
+  TRY: { symbol: '₺', name: 'Turkish Lira' },
+  USD: { symbol: '$', name: 'US Dollar' },
+  EUR: { symbol: '€', name: 'Euro' },
+  GBP: { symbol: '£', name: 'British Pound' },
+  RUB: { symbol: '₽', name: 'Russian Ruble' },
+  AED: { symbol: 'د.إ', name: 'UAE Dirham' },
+  JPY: { symbol: '¥', name: 'Japanese Yen' },
+  CHF: { symbol: 'Fr', name: 'Swiss Franc' },
+  CAD: { symbol: 'C$', name: 'Canadian Dollar' },
+  AUD: { symbol: 'A$', name: 'Australian Dollar' },
 };
 
-const CURRENCY_META: Record<string, { symbol: string; name: string; flag: string }> = {
-  TRY: { symbol: '₺', name: 'Turkish Lira', flag: '🇹🇷' },
-  USD: { symbol: '$', name: 'US Dollar', flag: '🇺🇸' },
-  EUR: { symbol: '€', name: 'Euro', flag: '🇪🇺' },
-  GBP: { symbol: '£', name: 'British Pound', flag: '🇬🇧' },
-  RUB: { symbol: '₽', name: 'Russian Ruble', flag: '🇷🇺' },
-  AED: { symbol: 'د.إ', name: 'UAE Dirham', flag: '🇦🇪' },
-};
+function currencySymbol(code: string): string {
+  return CURRENCY_META[code]?.symbol ?? code;
+}
+
+function CurrencySymbolIcon({ code, size = 'md' }: { code: string; size?: 'sm' | 'md' | 'lg' }) {
+  const sizeClass = size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-sm' : 'text-xl';
+  return (
+    <span className={cn('font-semibold text-brand-400 leading-none', sizeClass)} aria-hidden>
+      {currencySymbol(code)}
+    </span>
+  );
+}
 
 const CHAIN_CONFIRMATIONS: Record<string, { blocks: number; time: string }> = {
   bsc: { blocks: 15, time: '~1 min' },
@@ -1107,11 +1110,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
-              {CURRENCY_FLAG[selectedFiatCurrency] ? (
-                <img src={CURRENCY_FLAG[selectedFiatCurrency]} alt={selectedFiatCurrency} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
-              ) : (
-                <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
-              )}
+              <CurrencySymbolIcon code={selectedFiatCurrency} size="sm" />
               {selectedFiatCurrency} — P2P
             </div>
           </div>
@@ -1171,11 +1170,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
-              {CURRENCY_FLAG[selectedFiatCurrency] ? (
-                <img src={CURRENCY_FLAG[selectedFiatCurrency]} alt={selectedFiatCurrency} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
-              ) : (
-                <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
-              )}
+              <CurrencySymbolIcon code={selectedFiatCurrency} size="sm" />
               {selectedFiatCurrency} — Credit Card
             </div>
           </div>
@@ -1204,11 +1199,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
 
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 text-brand-400 text-xs font-medium">
-              {CURRENCY_FLAG[selectedFiatCurrency] ? (
-                <img src={CURRENCY_FLAG[selectedFiatCurrency]} alt={selectedFiatCurrency} width={18} height={18} className="rounded-full object-cover" style={{ width: 18, height: 18 }} />
-              ) : (
-                <span className="text-base leading-none">{CURRENCY_META[selectedFiatCurrency]?.flag || '💱'}</span>
-              )}
+              <CurrencySymbolIcon code={selectedFiatCurrency} size="sm" />
               {selectedFiatCurrency} — {CURRENCY_META[selectedFiatCurrency]?.name || selectedFiatCurrency}
             </div>
           </div>
@@ -1252,19 +1243,14 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
               const c = ((m.config?.currency as string) || m.currency || '').toUpperCase();
               return c === cur;
             }).length;
-            const flagSrc = CURRENCY_FLAG[cur];
             return (
               <button
                 key={cur}
                 onClick={() => setSelectedFiatCurrency(cur)}
                 className="p-4 rounded-xl border-2 border-glass-border bg-surface-100 hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all text-center"
               >
-                <div className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center mx-auto mb-2 overflow-hidden">
-                  {flagSrc ? (
-                    <img src={flagSrc} alt={cur} width={40} height={40} className="object-cover w-full h-full" />
-                  ) : (
-                    <span className="text-xl">{meta?.flag || '💱'}</span>
-                  )}
+                <div className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center mx-auto mb-2">
+                  <CurrencySymbolIcon code={cur} size="lg" />
                 </div>
                 <div className="text-sm font-semibold text-white">{cur}</div>
                 <div className="text-[11px] text-gray-500 mt-0.5">{meta?.name || cur}</div>

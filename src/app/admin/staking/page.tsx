@@ -17,11 +17,13 @@ interface PeriodFormRow {
 }
 
 const emptyPeriod = (): PeriodFormRow => ({
-  label: '',
+  label: '3 Months',
   duration_days: '90',
   reward_percent: '5',
   is_active: true,
 });
+
+const normalizeDecimal = (value: string) => value.trim().replace(',', '.').replace(/%/g, '');
 
 const inputCls = 'w-full h-9 px-3 text-sm bg-white/[0.03] border border-white/[0.08] rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/40';
 
@@ -32,6 +34,7 @@ export default function AdminStakingPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AdminStakingProduct | null>(null);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   const [asset, setAsset] = useState('');
   const [name, setName] = useState('');
@@ -63,6 +66,7 @@ export default function AdminStakingPage() {
     setMinStake('');
     setIsActive(true);
     setPeriods([emptyPeriod()]);
+    setModalError('');
     setModalOpen(true);
   };
 
@@ -83,15 +87,40 @@ export default function AdminStakingPage() {
           }))
         : [emptyPeriod()],
     );
+    setModalError('');
     setModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!asset.trim() || !name.trim()) return;
-    const validPeriods = periods.filter(p => p.label.trim() && p.duration_days && p.reward_percent);
-    if (validPeriods.length === 0) {
-      setError('Add at least one lock period');
+    setModalError('');
+    if (!asset.trim() || !name.trim()) {
+      setModalError('Asset and display name are required');
       return;
+    }
+
+    const preparedPeriods = periods.map(p => ({
+      label: p.label.trim(),
+      duration_days: p.duration_days.trim(),
+      reward_percent: normalizeDecimal(p.reward_percent),
+      is_active: p.is_active,
+    }));
+
+    const validPeriods = preparedPeriods.filter(p => p.label && p.duration_days && p.reward_percent);
+    if (validPeriods.length === 0) {
+      setModalError('Add at least one lock period with label, days, and return %');
+      return;
+    }
+
+    for (const p of validPeriods) {
+      const days = parseInt(p.duration_days, 10);
+      if (!Number.isFinite(days) || days <= 0) {
+        setModalError(`"${p.label}" needs a valid day count (1 or more)`);
+        return;
+      }
+      if (Number.isNaN(Number(p.reward_percent))) {
+        setModalError(`"${p.label}" needs a valid return % (e.g. 5 or 7.5)`);
+        return;
+      }
     }
 
     setSaving(true);
@@ -101,10 +130,10 @@ export default function AdminStakingPage() {
         asset: asset.trim().toUpperCase(),
         name: name.trim(),
         description: description.trim() || undefined,
-        min_stake: minStake.trim() || undefined,
+        min_stake: minStake.trim() ? normalizeDecimal(minStake) : undefined,
         is_active: isActive,
         periods: validPeriods.map((p, i) => ({
-          label: p.label.trim(),
+          label: p.label,
           duration_days: parseInt(p.duration_days, 10),
           reward_percent: p.reward_percent,
           is_active: p.is_active,
@@ -120,7 +149,9 @@ export default function AdminStakingPage() {
       setModalOpen(false);
       await fetchProducts();
     } catch (e) {
-      setError(e instanceof AdminApiError ? e.detail : 'Save failed');
+      const msg = e instanceof AdminApiError ? e.detail : 'Save failed';
+      setModalError(msg);
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -344,6 +375,12 @@ export default function AdminStakingPage() {
                     ))}
                   </div>
                 </div>
+
+                {modalError && (
+                  <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2">
+                    {modalError}
+                  </p>
+                )}
 
                 <button
                   onClick={handleSave}

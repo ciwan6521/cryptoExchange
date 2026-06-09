@@ -48,16 +48,27 @@ def _to_response(product: StakingProduct) -> StakingProductResponse:
     )
 
 
+def _normalize_decimal_str(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip().replace(",", ".").rstrip("%").strip()
+    return cleaned or None
+
+
 def _parse_decimal(value: str | None, field: str) -> Decimal | None:
-    if value is None or value == "":
+    normalized = _normalize_decimal_str(value)
+    if normalized is None:
         return None
     try:
-        d = Decimal(value)
+        d = Decimal(normalized)
         if d < 0:
             raise ValueError
         return d
     except (InvalidOperation, ValueError):
-        raise HTTPException(status_code=400, detail=f"Invalid {field}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {field}: use numbers only (e.g. 5 or 10.5)",
+        )
 
 
 async def _replace_periods(db: AsyncSession, product: StakingProduct, periods_input):
@@ -65,12 +76,15 @@ async def _replace_periods(db: AsyncSession, product: StakingProduct, periods_in
     await db.flush()
 
     for i, p in enumerate(periods_input):
+        label = p.label.strip()
+        if not label:
+            raise HTTPException(status_code=400, detail="Each lock period needs a label")
         reward = _parse_decimal(p.reward_percent, "reward_percent")
         if reward is None:
-            raise HTTPException(status_code=400, detail="reward_percent is required")
+            raise HTTPException(status_code=400, detail="Each lock period needs a return %")
         period = StakingPeriod(
             product_id=product.id,
-            label=p.label.strip(),
+            label=label,
             duration_days=p.duration_days,
             reward_percent=reward,
             is_active=p.is_active,
@@ -100,6 +114,9 @@ async def create_product(
     admin: AdminUser = Depends(require_admin_role("super_admin", "operator", "finance")),
     db: AsyncSession = Depends(get_db),
 ):
+    if not body.periods:
+        raise HTTPException(status_code=400, detail="Add at least one lock period")
+
     min_stake = _parse_decimal(body.min_stake, "min_stake")
 
     product = StakingProduct(

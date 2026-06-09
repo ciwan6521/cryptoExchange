@@ -37,7 +37,18 @@ async function adminRequest<T>(
     let detail = 'Unknown error';
     try {
       const body = await res.json();
-      detail = body.detail || body.message || JSON.stringify(body);
+      if (Array.isArray(body.detail)) {
+        detail = body.detail
+          .map((item: { msg?: string; loc?: (string | number)[] }) => {
+            const field = item.loc?.slice(-1)[0];
+            return field ? `${field}: ${item.msg}` : (item.msg || 'Validation error');
+          })
+          .join('; ');
+      } else if (typeof body.detail === 'string') {
+        detail = body.detail;
+      } else {
+        detail = body.message || JSON.stringify(body);
+      }
     } catch {
       detail = res.statusText;
     }
